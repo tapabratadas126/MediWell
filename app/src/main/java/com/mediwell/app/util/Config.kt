@@ -22,7 +22,7 @@ object Config {
 
     // Gemini API endpoint for Google AI Studio
     const val GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
-    const val GEMINI_MODEL = "gemini-1.5-flash"
+    const val GEMINI_MODEL = "gemini-flash-latest"
 
     val isSupabaseConfigured: Boolean
         get() = supabaseAnonKey.isNotBlank() && !supabaseAnonKey.contains("PLACEHOLDER")
