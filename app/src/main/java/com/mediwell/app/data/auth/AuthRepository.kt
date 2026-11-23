@@ -12,6 +12,7 @@ import com.mediwell.app.util.AppResult
 import com.mediwell.app.util.Config
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.Google
+import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.flow.Flow
@@ -58,6 +59,106 @@ class AuthRepository(private val context: Context) {
         return supabaseAuth.currentUserOrNull()?.id 
             ?: cachedDemoSession?.userId 
             ?: "guest_user_${UUID.randomUUID().toString().take(8)}"
+    }
+
+    /**
+     * Authenticates an existing user using Supabase Email + Password.
+     */
+    suspend fun signInWithEmail(email: String, password: String): AppResult<UserSession> {
+        val cleanEmail = email.trim()
+        if (cleanEmail.isBlank() || password.isBlank()) {
+            return AppResult.Error("Please enter both email and password")
+        }
+
+        try {
+            if (!Config.isSupabaseConfigured) {
+                Log.w(tag, "Supabase anon key is a placeholder. Using demo authenticated session.")
+                return continueWithDemoSession("Prototype User", cleanEmail)
+            }
+
+            supabaseAuth.signInWith(Email) {
+                this.email = cleanEmail
+                this.password = password
+            }
+
+            val user = supabaseAuth.currentUserOrNull()
+            return if (user != null) {
+                AppResult.Success(
+                    UserSession(
+                        userId = user.id,
+                        email = user.email,
+                        displayName = user.email ?: "Authenticated User"
+                    )
+                )
+            } else {
+                AppResult.Error("Sign in completed but user profile was null")
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Supabase email sign in error: ${e.message}", e)
+            val friendlyMessage = when {
+                e.message?.contains("Invalid login credentials", ignoreCase = true) == true ->
+                    "Invalid email or password. Please verify and try again."
+                e.message?.contains("Email not confirmed", ignoreCase = true) == true ->
+                    "Please confirm your email address before logging in."
+                else -> e.localizedMessage ?: "Failed to sign in. Please try again."
+            }
+            return AppResult.Error(friendlyMessage, e)
+        }
+    }
+
+    /**
+     * Registers a new user with Supabase Auth using Email + Password.
+     */
+    suspend fun signUpWithEmail(email: String, password: String): AppResult<UserSession> {
+        val cleanEmail = email.trim()
+        if (cleanEmail.isBlank() || password.isBlank()) {
+            return AppResult.Error("Please enter both email and password")
+        }
+        if (password.length < 6) {
+            return AppResult.Error("Password must be at least 6 characters")
+        }
+
+        try {
+            if (!Config.isSupabaseConfigured) {
+                Log.w(tag, "Supabase anon key is a placeholder. Using demo authenticated session.")
+                return continueWithDemoSession("New User", cleanEmail)
+            }
+
+            supabaseAuth.signUpWith(Email) {
+                this.email = cleanEmail
+                this.password = password
+            }
+
+            val user = supabaseAuth.currentUserOrNull()
+            return if (user != null) {
+                AppResult.Success(
+                    UserSession(
+                        userId = user.id,
+                        email = user.email,
+                        displayName = user.email ?: cleanEmail
+                    )
+                )
+            } else {
+                // Supabase might have sent a confirmation email if email confirmation is enabled
+                AppResult.Success(
+                    UserSession(
+                        userId = "pending_confirmation",
+                        email = cleanEmail,
+                        displayName = cleanEmail
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Supabase email sign up error: ${e.message}", e)
+            val friendlyMessage = when {
+                e.message?.contains("User already registered", ignoreCase = true) == true ->
+                    "An account with this email already exists. Please sign in instead."
+                e.message?.contains("Password should be", ignoreCase = true) == true ->
+                    "Password is too weak. Please use at least 6 characters."
+                else -> e.localizedMessage ?: "Failed to create account. Please try again."
+            }
+            return AppResult.Error(friendlyMessage, e)
+        }
     }
 
     /**

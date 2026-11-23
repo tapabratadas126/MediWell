@@ -24,12 +24,74 @@ class AuthViewModel(
     private val _uiState = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
+    private val _email = MutableStateFlow("")
+    val email: StateFlow<String> = _email.asStateFlow()
+
+    private val _password = MutableStateFlow("")
+    val password: StateFlow<String> = _password.asStateFlow()
+
+    private val _isSignUp = MutableStateFlow(false)
+    val isSignUp: StateFlow<Boolean> = _isSignUp.asStateFlow()
+
     init {
         viewModelScope.launch {
             authRepository.currentUserSession.collect { session ->
                 if (session != null) {
                     _uiState.value = AuthUiState.Authenticated(session)
                 }
+            }
+        }
+    }
+
+    fun updateEmail(value: String) {
+        _email.value = value
+    }
+
+    fun updatePassword(value: String) {
+        _password.value = value
+    }
+
+    fun toggleAuthMode() {
+        _isSignUp.value = !_isSignUp.value
+        clearError()
+    }
+
+    fun setAuthMode(isSignUpMode: Boolean) {
+        _isSignUp.value = isSignUpMode
+        clearError()
+    }
+
+    fun clearError() {
+        if (_uiState.value is AuthUiState.Error) {
+            _uiState.value = AuthUiState.Idle
+        }
+    }
+
+    fun submitEmailAuth() {
+        val currentEmail = _email.value.trim()
+        val currentPassword = _password.value
+
+        if (currentEmail.isBlank() || currentPassword.isBlank()) {
+            _uiState.value = AuthUiState.Error("Please enter your email and password.")
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            val result = if (_isSignUp.value) {
+                authRepository.signUpWithEmail(currentEmail, currentPassword)
+            } else {
+                authRepository.signInWithEmail(currentEmail, currentPassword)
+            }
+
+            when (result) {
+                is AppResult.Success -> {
+                    _uiState.value = AuthUiState.Authenticated(result.data)
+                }
+                is AppResult.Error -> {
+                    _uiState.value = AuthUiState.Error(result.message)
+                }
+                is AppResult.Loading -> Unit
             }
         }
     }
