@@ -7,8 +7,8 @@ import com.mediwell.app.data.model.CacheFindingsEntity
 import com.mediwell.app.data.model.ClinicianFindingItem
 import com.mediwell.app.data.model.ClinicianMedicationItem
 import com.mediwell.app.data.model.ClinicianViewReport
-import com.mediwell.app.data.model.ConfidenceLevel
 import com.mediwell.app.data.model.FindingSeverity
+import com.mediwell.app.data.model.FindingType
 import com.mediwell.app.data.model.MedicationItem
 import com.mediwell.app.data.model.PatientFindingCard
 import com.mediwell.app.data.model.PatientViewReport
@@ -76,11 +76,11 @@ class ReportRepository(
             val patientFindingCards = processedFindings.map { finding ->
                 val involved = listOfNotNull(finding.drugName1, finding.drugName2)
                 val title = when (finding.type) {
-                    com.mediwell.app.data.model.FindingType.DUPLICATE_INGREDIENT ->
+                    FindingType.DUPLICATE_INGREDIENT ->
                         "Duplicate Medication Detected"
-                    com.mediwell.app.data.model.FindingType.DRUG_INTERACTION ->
+                    FindingType.DRUG_INTERACTION ->
                         "Interaction: ${finding.drugName1} + ${finding.drugName2 ?: ""}"
-                    com.mediwell.app.data.model.FindingType.QT_RISK ->
+                    FindingType.QT_RISK ->
                         "Heart Rhythm Precaution: ${finding.drugName1} + ${finding.drugName2 ?: ""}"
                     else -> "Medication Safety Notice"
                 }

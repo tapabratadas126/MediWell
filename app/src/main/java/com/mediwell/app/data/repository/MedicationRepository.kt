@@ -11,7 +11,6 @@ import com.mediwell.app.data.model.RxNormCacheEntity
 import com.mediwell.app.util.AppResult
 import com.mediwell.app.util.Config
 import io.github.jan.supabase.postgrest.from
-import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

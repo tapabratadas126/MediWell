@@ -10,12 +10,14 @@ import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.realtime.Realtime
 import io.github.jan.supabase.realtime.realtime
-import io.ktor.client.engine.android.Android
+import io.ktor.client.plugins.HttpTimeout
 import kotlinx.serialization.json.Json
 
 /**
  * Singleton provider for SupabaseClient.
  * Uses public SUPABASE_ANON_KEY (never service role key).
+ * Engine (ktor-client-android) is auto-discovered by Ktor's service loader
+ * from the declared Gradle dependency — no explicit engine() call needed in Supabase 3.x.
  */
 object SupabaseClientProvider {
     private const val TAG = "SupabaseClient"
@@ -33,9 +35,16 @@ object SupabaseClientProvider {
             supabaseUrl = Config.supabaseUrl,
             supabaseKey = Config.supabaseAnonKey
         ) {
-            httpEngine = Android.create()
+            // Supabase 3.x: httpConfig configures Ktor plugin behaviour.
+            // The Android engine is auto-detected from ktor-client-android on the classpath.
+            httpConfig {
+                install(HttpTimeout) {
+                    requestTimeoutMillis = 30_000L
+                    connectTimeoutMillis = 15_000L
+                    socketTimeoutMillis = 30_000L
+                }
+            }
             install(Auth) {
-                // Settings for Auth
                 alwaysAutoRefresh = true
                 autoLoadFromStorage = true
             }
@@ -50,3 +59,4 @@ object SupabaseClientProvider {
     val postgrest: Postgrest get() = client.postgrest
     val realtime: Realtime get() = client.realtime
 }
+

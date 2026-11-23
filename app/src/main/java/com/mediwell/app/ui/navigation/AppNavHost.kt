@@ -2,6 +2,7 @@ package com.mediwell.app.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -20,12 +21,14 @@ import com.mediwell.app.ui.screens.medication.MedicationEntryScreen
 import com.mediwell.app.ui.screens.medication.MedicationViewModel
 import com.mediwell.app.ui.screens.report.ReportScreen
 import com.mediwell.app.ui.screens.report.ReportViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun AppNavHost(
     navController: NavHostController = rememberNavController()
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     // Repositories
     val authRepository = remember { AuthRepository(context) }
@@ -64,7 +67,7 @@ fun AppNavHost(
                     navController.navigate(Screen.Report.route)
                 },
                 onSignOut = {
-                    authRepository.signOut()
+                    coroutineScope.launch { authRepository.signOut() }
                     navController.navigate(Screen.Auth.route) {
                         popUpTo(0) { inclusive = true }
                     }

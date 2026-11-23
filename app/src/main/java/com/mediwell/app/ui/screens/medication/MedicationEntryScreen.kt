@@ -56,7 +56,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mediwell.app.data.model.MedicationItem
 import com.mediwell.app.ui.components.AppTopBar
-import com.mediwell.app.ui.theme.OutlineBorder
 import com.mediwell.app.ui.theme.TealContainer
 import com.mediwell.app.ui.theme.TealOnContainer
 import com.mediwell.app.ui.theme.TealPrimary
