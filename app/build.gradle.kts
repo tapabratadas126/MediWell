@@ -40,14 +40,20 @@ android {
             ?: System.getenv("GEMINI_API_KEY") 
             ?: "GEMINI_API_KEY_PLACEHOLDER"
             
-        val ocrApiKey = localProperties.getProperty("OCR_API_KEY") 
-            ?: System.getenv("OCR_API_KEY") 
+        val ocrApiKey = localProperties.getProperty("OCR_API_KEY")
+            ?: System.getenv("OCR_API_KEY")
             ?: "OCR_API_KEY_PLACEHOLDER"
+
+        val googleClientId = localProperties.getProperty("GOOGLE_CLIENT_ID")
+            ?: System.getenv("GOOGLE_CLIENT_ID")
+            ?: "GOOGLE_CLIENT_ID_PLACEHOLDER" 
+
 
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
         buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
         buildConfigField("String", "OCR_API_KEY", "\"$ocrApiKey\"")
+        buildConfigField("String", "GOOGLE_CLIENT_ID", "\"$googleClientId\"")
     }
 
     buildTypes {

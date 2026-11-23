@@ -12,6 +12,8 @@ object Config {
     val supabaseAnonKey: String = BuildConfig.SUPABASE_ANON_KEY
     val geminiApiKey: String = BuildConfig.GEMINI_API_KEY
     val ocrApiKey: String = BuildConfig.OCR_API_KEY
+    // Google OAuth Web Client ID for sign‑in with Google
+    val googleClientId: String = BuildConfig.GOOGLE_CLIENT_ID
 
     // Fixed, non-editable referral line required on every report
     const val FIXED_REFERRAL_DISCLAIMER =
