@@ -36,12 +36,12 @@ class AuthRepository(private val context: Context) {
     val currentUserSession: Flow<UserSession?> = supabaseAuth.sessionStatus.map { status ->
         when (status) {
             is SessionStatus.Authenticated -> {
-                val user = status.value.user
+                val user = status.session.user
                 if (user != null) {
                     UserSession(
                         userId = user.id,
                         email = user.email,
-                        displayName = user.userMetadata?.get("full_name")?.toString()?.replace("\"", "") ?: user.email
+                        displayName = user.email ?: "Authenticated User"
                     )
                 } else null
             }
