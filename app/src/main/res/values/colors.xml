@@ -1,0 +1,23 @@
+<resources>
+    <color name="primary">#0D5C75</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="primary_container">#D4F0F7</color>
+    <color name="on_primary_container">#032632</color>
+
+    <color name="secondary">#526065</color>
+    <color name="on_secondary">#FFFFFF</color>
+
+    <color name="background">#F7FAF8</color>
+    <color name="on_background">#1A1C1E</color>
+
+    <color name="surface">#FFFFFF</color>
+    <color name="on_surface">#1A1C1E</color>
+
+    <color name="error">#BA1A1A</color>
+    <color name="on_error">#FFFFFF</color>
+
+    <color name="badge_verified">#1B5E20</color>
+    <color name="badge_verified_bg">#E8F5E9</color>
+    <color name="badge_review">#E65100</color>
+    <color name="badge_review_bg">#FFF3E0</color>
+</resources>

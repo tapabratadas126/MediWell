@@ -1,0 +1,237 @@
+package com.mediwell.app.data.repository
+
+import android.util.Log
+import com.mediwell.app.data.client.GeminiClient
+import com.mediwell.app.data.client.SupabaseClientProvider
+import com.mediwell.app.data.model.CacheFindingsEntity
+import com.mediwell.app.data.model.ClinicianFindingItem
+import com.mediwell.app.data.model.ClinicianMedicationItem
+import com.mediwell.app.data.model.ClinicianViewReport
+import com.mediwell.app.data.model.ConfidenceLevel
+import com.mediwell.app.data.model.FindingSeverity
+import com.mediwell.app.data.model.MedicationItem
+import com.mediwell.app.data.model.PatientFindingCard
+import com.mediwell.app.data.model.PatientViewReport
+import com.mediwell.app.data.model.ReportEntity
+import com.mediwell.app.data.model.SafetyFinding
+import com.mediwell.app.util.AppResult
+import com.mediwell.app.util.Config
+import io.github.jan.supabase.postgrest.from
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.UUID
+
+class ReportRepository(
+    private val geminiClient: GeminiClient = GeminiClient()
+) {
+    private val tag = "ReportRepository"
+
+    private val json = Json {
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+        prettyPrint = true
+    }
+
+    // In-memory cache for fast lookups
+    private val localFindingSentenceCache = mutableMapOf<String, String>()
+
+    /**
+     * Generate the complete dual-view report (Patient + Clinician).
+     *
+     * Pipeline per finding:
+     * 1. Check `cache_findings` in Supabase
+     * 2. On miss: call Gemini API with ONLY that single finding
+     * 3. Cache the plain language result
+     * 4. Assemble report views
+     * 5. End with the fixed, non-editable referral disclaimer
+     * 6. Persist to `reports` table in Supabase
+     */
+    suspend fun generateSafetyReport(
+        userId: String,
+        medications: List<MedicationItem>,
+        rawFindings: List<SafetyFinding>
+    ): AppResult<Pair<PatientViewReport, ClinicianViewReport>> = withContext(Dispatchers.IO) {
+        try {
+            val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
+            val timestamp = dateFormat.format(Date())
+
+            // Rephrase each finding: check cache first, then Gemini (one finding at a time)
+            val processedFindings = rawFindings.map { finding ->
+                val findingKey = computeFindingKey(finding)
+                val (sentence, rephrasedBy) = getOrRephraseSentence(finding, findingKey)
+
+                finding.copy(
+                    findingKey = findingKey,
+                    plainLanguageSentence = sentence,
+                    rephrasedBy = rephrasedBy
+                )
+            }
+
+            // Assemble Patient View
+            val patientFindingCards = processedFindings.map { finding ->
+                val involved = listOfNotNull(finding.drugName1, finding.drugName2)
+                val title = when (finding.type) {
+                    com.mediwell.app.data.model.FindingType.DUPLICATE_INGREDIENT ->
+                        "Duplicate Medication Detected"
+                    com.mediwell.app.data.model.FindingType.DRUG_INTERACTION ->
+                        "Interaction: ${finding.drugName1} + ${finding.drugName2 ?: ""}"
+                    com.mediwell.app.data.model.FindingType.QT_RISK ->
+                        "Heart Rhythm Precaution: ${finding.drugName1} + ${finding.drugName2 ?: ""}"
+                    else -> "Medication Safety Notice"
+                }
+
+                val severityLabel = when (finding.severity) {
+                    FindingSeverity.CRITICAL -> "High Risk"
+                    FindingSeverity.WARNING -> "Warning"
+                    FindingSeverity.INFO -> "Informational"
+                }
+
+                PatientFindingCard(
+                    findingKey = finding.findingKey,
+                    title = title,
+                    plainLanguageExplanation = finding.plainLanguageSentence,
+                    confidenceBadge = finding.confidence.label,
+                    severityBadge = severityLabel,
+                    involvedMedications = involved
+                )
+            }
+
+            val patientView = PatientViewReport(
+                title = "Medication Safety Summary",
+                generatedAt = timestamp,
+                totalMedicationsChecked = medications.size,
+                totalFindings = processedFindings.size,
+                findings = patientFindingCards,
+                // Fixed, non-editable referral line
+                fixedReferralNotice = Config.FIXED_REFERRAL_DISCLAIMER
+            )
+
+            // Assemble Clinician View (with formal terminology, RxCUIs, mechanisms, and sources)
+            val clinicianMeds = medications.map { med ->
+                ClinicianMedicationItem(
+                    name = med.rawName,
+                    rxcui = med.matchedRxcui,
+                    activeIngredients = med.normalizedIngredient,
+                    dose = med.dose,
+                    frequency = med.frequency,
+                    route = med.route
+                )
+            }
+
+            val clinicianFindings = processedFindings.map { f ->
+                ClinicianFindingItem(
+                    drugA = f.drugName1,
+                    drugB = f.drugName2,
+                    type = f.type.dbValue,
+                    severity = f.severity.dbValue,
+                    mechanism = f.mechanismOrDetail,
+                    sourceCitation = f.sourceCitation,
+                    confidence = f.confidence.dbValue
+                )
+            }
+
+            val clinicianView = ClinicianViewReport(
+                generatedAt = timestamp,
+                medications = clinicianMeds,
+                findings = clinicianFindings,
+                disclaimer = Config.FIXED_REFERRAL_DISCLAIMER
+            )
+
+            // Persist report to Supabase `reports` table
+            if (Config.isSupabaseConfigured) {
+                try {
+                    val reportEntity = ReportEntity(
+                        id = UUID.randomUUID().toString(),
+                        userId = userId,
+                        generatedAt = timestamp,
+                        patientViewJson = json.encodeToString(patientView),
+                        clinicianViewJson = json.encodeToString(clinicianView)
+                    )
+                    SupabaseClientProvider.postgrest.from("reports").insert(reportEntity)
+                } catch (e: Exception) {
+                    Log.w(tag, "Failed to persist report to Supabase: ${e.message}")
+                }
+            }
+
+            AppResult.Success(Pair(patientView, clinicianView))
+        } catch (e: Exception) {
+            Log.e(tag, "Report generation failed: ${e.message}", e)
+            AppResult.Error("Failed to generate report: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Compute a deterministic key for the finding to check cache_findings table.
+     */
+    private fun computeFindingKey(finding: SafetyFinding): String {
+        val d1 = finding.drugName1.lowercase().replace(Regex("[^a-z0-9]"), "")
+        val d2 = (finding.drugName2 ?: "none").lowercase().replace(Regex("[^a-z0-9]"), "")
+        val drugs = listOf(d1, d2).sorted().joinToString("_")
+        return "fnd_${finding.type.dbValue}_${finding.severity.dbValue}_$drugs"
+    }
+
+    /**
+     * 1. Check local memory cache
+     * 2. Check Supabase `cache_findings`
+     * 3. On miss: call Gemini API (one finding only)
+     * 4. Cache and return
+     */
+    private suspend fun getOrRephraseSentence(
+        finding: SafetyFinding,
+        findingKey: String
+    ): Pair<String, String> {
+        // 1. Check memory cache
+        localFindingSentenceCache[findingKey]?.let {
+            return Pair(it, "cache")
+        }
+
+        // 2. Check Supabase cache_findings table
+        if (Config.isSupabaseConfigured) {
+            try {
+                val cached = SupabaseClientProvider.postgrest
+                    .from("cache_findings")
+                    .select {
+                        filter {
+                            eq("finding_key", findingKey)
+                        }
+                    }
+                    .decodeSingleOrNull<CacheFindingsEntity>()
+
+                if (cached != null && cached.sentence.isNotBlank()) {
+                    localFindingSentenceCache[findingKey] = cached.sentence
+                    return Pair(cached.sentence, cached.generatedBy)
+                }
+            } catch (e: Exception) {
+                Log.d(tag, "Supabase cache_findings lookup error: ${e.message}")
+            }
+        }
+
+        // 3. On cache miss: Call Gemini API with ONLY this one structured finding
+        val generatedSentence = geminiClient.rephraseFinding(finding)
+        val generator = if (Config.isGeminiConfigured) "gemini" else "deterministic_template"
+
+        // Store in memory cache
+        localFindingSentenceCache[findingKey] = generatedSentence
+
+        // Write to Supabase cache_findings table if configured
+        if (Config.isSupabaseConfigured) {
+            try {
+                val cacheEntry = CacheFindingsEntity(
+                    findingKey = findingKey,
+                    sentence = generatedSentence,
+                    generatedBy = generator
+                )
+                SupabaseClientProvider.postgrest.from("cache_findings").upsert(cacheEntry)
+            } catch (e: Exception) {
+                Log.d(tag, "Could not write to cache_findings: ${e.message}")
+            }
+        }
+
+        return Pair(generatedSentence, generator)
+    }
+}

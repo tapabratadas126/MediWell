@@ -1,0 +1,71 @@
+package com.mediwell.app.data.model
+
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+/**
+ * Maps to the `reports` table in Supabase.
+ * RLS: auth.uid() = user_id
+ */
+@Serializable
+data class ReportEntity(
+    @SerialName("id")
+    val id: String = "",
+    @SerialName("user_id")
+    val userId: String = "",
+    @SerialName("generated_at")
+    val generatedAt: String? = null,
+    @SerialName("patient_view_json")
+    val patientViewJson: String,
+    @SerialName("clinician_view_json")
+    val clinicianViewJson: String
+)
+
+@Serializable
+data class PatientViewReport(
+    val title: String = "Medication Safety Report",
+    val generatedAt: String,
+    val totalMedicationsChecked: Int,
+    val totalFindings: Int,
+    val findings: List<PatientFindingCard>,
+    val fixedReferralNotice: String
+)
+
+@Serializable
+data class PatientFindingCard(
+    val findingKey: String,
+    val title: String,
+    val plainLanguageExplanation: String,
+    val confidenceBadge: String, // "Verified" or "Needs Review"
+    val severityBadge: String, // "High Risk", "Warning", "Informational"
+    val involvedMedications: List<String>
+)
+
+@Serializable
+data class ClinicianViewReport(
+    val generatedAt: String,
+    val medications: List<ClinicianMedicationItem>,
+    val findings: List<ClinicianFindingItem>,
+    val disclaimer: String
+)
+
+@Serializable
+data class ClinicianMedicationItem(
+    val name: String,
+    val rxcui: String?,
+    val activeIngredients: String?,
+    val dose: String?,
+    val frequency: String?,
+    val route: String?
+)
+
+@Serializable
+data class ClinicianFindingItem(
+    val drugA: String,
+    val drugB: String?,
+    val type: String,
+    val severity: String,
+    val mechanism: String,
+    val sourceCitation: String,
+    val confidence: String
+)
