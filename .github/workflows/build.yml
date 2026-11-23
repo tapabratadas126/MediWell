@@ -28,7 +28,7 @@ jobs:
       - name: Build MediWell APK
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --stacktrace
 
       - name: Upload MediWell APK
         uses: actions/upload-artifact@v4
