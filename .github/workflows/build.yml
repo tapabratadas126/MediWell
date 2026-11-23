@@ -28,7 +28,17 @@ jobs:
       - name: Build MediWell APK
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleDebug --stacktrace 2>&1 | tee build.log || true
+          if [ ! -f app/build/outputs/apk/debug/app-debug.apk ]; then
+            echo "## Gradle Build Failure" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            grep -C 2 -E "(e: |Compilation error|FAILURE:)" build.log | head -n 50 >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            grep -E "^e: " build.log | head -n 30 | while IFS= read -r line; do
+              echo "::error title=Kotlin Compilation Error::$line"
+            done
+            exit 1
+          fi
 
       - name: Upload MediWell APK
         uses: actions/upload-artifact@v4
