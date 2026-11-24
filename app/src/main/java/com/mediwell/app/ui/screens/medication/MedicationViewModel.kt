@@ -195,7 +195,7 @@ class MedicationViewModel(
         // Pattern: [dosage form?] DRUG_NAME STRENGTH FREQ? ROUTE?
         // e.g.  "Tab. Metformin 500mg BD PO"
         val structuredLineRe = Regex(
-            """(?i)^(?:tab(?:let)?\.?\s+|cap(?:sule)?\.?\s+|syp\.?\s+|inj\.?\s+)?([A-Za-z][\w\s\-]{1,40?}?)\s+""" +
+            """(?i)^(?:tab(?:let)?\.?\s+|cap(?:sule)?\.?\s+|syp\.?\s+|inj\.?\s+)?([A-Za-z][\w\s\-]{1,40}?)\s+""" +
             """(\d+(?:\.\d+)?(?:/\d+(?:\.\d+)?)?)\s*(mg|mcg|g|ml|l|iu|units?|%)\b"""
         )
 
