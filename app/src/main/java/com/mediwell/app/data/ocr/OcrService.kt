@@ -8,6 +8,7 @@ import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -66,20 +67,14 @@ object OcrService {
 
 @Serializable
 private data class OcrSpaceResponse(
-    val OCRExitCode: Int? = null,
-    val IsErroredOnProcessing: Boolean? = null,
-    val ErrorMessage: List<String>? = null,
-    val ErrorDetails: String? = null,
-    val ParsedResults: List<ParsedResult>? = null
-) {
-    val isErroredOnProcessing: Boolean? get() = IsErroredOnProcessing
-    val errorMessage: List<String>? get() = ErrorMessage
-    val parsedResults: List<ParsedResult>? get() = ParsedResults
-}
+    @SerialName("OCRExitCode") val ocrExitCode: Int? = null,
+    @SerialName("IsErroredOnProcessing") val isErroredOnProcessing: Boolean? = null,
+    @SerialName("ErrorMessage") val errorMessage: List<String>? = null,
+    @SerialName("ErrorDetails") val errorDetails: String? = null,
+    @SerialName("ParsedResults") val parsedResults: List<ParsedResult>? = null
+)
 
 @Serializable
 private data class ParsedResult(
-    val ParsedText: String? = null
-) {
-    val parsedText: String? get() = ParsedText
-}
+    @SerialName("ParsedText") val parsedText: String? = null
+)
