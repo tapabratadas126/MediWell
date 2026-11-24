@@ -72,8 +72,7 @@ class AuthRepository(private val context: Context) {
 
         try {
             if (!Config.isSupabaseConfigured) {
-                Log.w(tag, "Supabase anon key is a placeholder. Using demo authenticated session.")
-                return continueWithDemoSession("Prototype User", cleanEmail)
+                return AppResult.Error("Supabase is not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY.")
             }
 
             supabaseAuth.signInWith(Email) {
@@ -120,8 +119,7 @@ class AuthRepository(private val context: Context) {
 
         try {
             if (!Config.isSupabaseConfigured) {
-                Log.w(tag, "Supabase anon key is a placeholder. Using demo authenticated session.")
-                return continueWithDemoSession("New User", cleanEmail)
+                return AppResult.Error("Supabase is not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY.")
             }
 
             supabaseAuth.signUpWith(Email) {
