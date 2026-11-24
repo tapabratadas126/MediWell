@@ -3,9 +3,12 @@ package com.mediwell.app.ui.screens.medication
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.util.Base64
+import android.net.Uri
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import com.mediwell.app.data.ocr.ImageUtils
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Verified
@@ -94,11 +98,45 @@ fun MedicationEntryScreen(
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
     ) { bitmap ->
-        if (bitmap != null) {
-            val outputStream = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream)
-            val base64 = Base64.encodeToString(outputStream.toByteArray(), Base64.DEFAULT)
-            viewModel.processOcr(base64)
+        try {
+            if (bitmap != null) {
+                val base64 = ImageUtils.bitmapToBase64(bitmap)
+                if (!base64.isNullOrBlank()) {
+                    viewModel.processOcr(base64)
+                } else {
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar("Failed to process captured image")
+                    }
+                }
+            }
+        } catch (e: Throwable) {
+            Log.e("MedicationEntry", "Camera capture error", e)
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar("Unable to process camera image: ${e.message ?: "Unknown error"}")
+            }
+        }
+    }
+
+    // Photo Picker launcher for gallery images (requires no dangerous storage permissions on modern Android)
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        try {
+            if (uri != null) {
+                val base64 = ImageUtils.uriToBase64(context, uri)
+                if (!base64.isNullOrBlank()) {
+                    viewModel.processOcr(base64)
+                } else {
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar("Failed to decode prescription image")
+                    }
+                }
+            }
+        } catch (e: Throwable) {
+            Log.e("MedicationEntry", "Gallery photo picker error", e)
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar("Unable to read selected photo: ${e.message ?: "Unknown error"}")
+            }
         }
     }
 
@@ -107,7 +145,14 @@ fun MedicationEntryScreen(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            cameraLauncher.launch(null)
+            try {
+                cameraLauncher.launch(null)
+            } catch (e: Throwable) {
+                Log.e("MedicationEntry", "Error launching camera", e)
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("Could not open camera: ${e.message}")
+                }
+            }
         } else {
             coroutineScope.launch {
                 snackbarHostState.showSnackbar("Camera permission is required to scan prescriptions")
@@ -178,39 +223,77 @@ fun MedicationEntryScreen(
                 }
             }
 
-            // OCR Scanning Action
+            // OCR Scanning Actions (Camera & Photo Picker)
             item {
-                OutlinedButton(
-                    onClick = {
-                        val hasPermission = ContextCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.CAMERA
-                        ) == PackageManager.PERMISSION_GRANTED
-
-                        if (hasPermission) {
-                            cameraLauncher.launch(null)
-                        } else {
-                            permissionLauncher.launch(Manifest.permission.CAMERA)
-                        }
-                    },
-                    enabled = entryState !is MedicationEntryState.ScanningOcr && entryState !is MedicationEntryState.Normalizing,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                    shape = RoundedCornerShape(10.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    if (entryState is MedicationEntryState.ScanningOcr) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = TealPrimary,
-                            strokeWidth = 2.dp
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Reading Prescription...")
-                    } else {
-                        Icon(Icons.Default.CameraAlt, contentDescription = "Camera", tint = TealPrimary)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Scan Prescription with Camera (OCR)", color = TealPrimary, fontWeight = FontWeight.SemiBold)
+                    // Camera Button
+                    OutlinedButton(
+                        onClick = {
+                            try {
+                                val hasPermission = ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.CAMERA
+                                ) == PackageManager.PERMISSION_GRANTED
+
+                                if (hasPermission) {
+                                    cameraLauncher.launch(null)
+                                } else {
+                                    permissionLauncher.launch(Manifest.permission.CAMERA)
+                                }
+                            } catch (e: Throwable) {
+                                Log.e("MedicationEntry", "Camera click error", e)
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("Unable to start camera: ${e.message}")
+                                }
+                            }
+                        },
+                        enabled = entryState !is MedicationEntryState.ScanningOcr && entryState !is MedicationEntryState.Normalizing,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        if (entryState is MedicationEntryState.ScanningOcr) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = TealPrimary,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Scanning...", fontSize = 13.sp)
+                        } else {
+                            Icon(Icons.Default.CameraAlt, contentDescription = "Camera", tint = TealPrimary)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Camera OCR", color = TealPrimary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        }
+                    }
+
+                    // Gallery / Photo Picker Button
+                    OutlinedButton(
+                        onClick = {
+                            try {
+                                galleryLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            } catch (e: Throwable) {
+                                Log.e("MedicationEntry", "Gallery click error", e)
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("Unable to open photo picker: ${e.message}")
+                                }
+                            }
+                        },
+                        enabled = entryState !is MedicationEntryState.ScanningOcr && entryState !is MedicationEntryState.Normalizing,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Image, contentDescription = "Gallery", tint = TealPrimary)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Pick Photo", color = TealPrimary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                     }
                 }
             }

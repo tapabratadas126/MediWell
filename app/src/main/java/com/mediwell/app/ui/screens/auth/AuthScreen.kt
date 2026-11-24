@@ -1,7 +1,6 @@
 package com.mediwell.app.ui.screens.auth
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,57 +15,35 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.mediwell.app.util.Config
-
-
 import com.mediwell.app.ui.theme.TealContainer
 import com.mediwell.app.ui.theme.TealOnContainer
 import com.mediwell.app.ui.theme.TealPrimary
+import com.mediwell.app.util.Config
 
 @Composable
 fun AuthScreen(
@@ -74,12 +51,6 @@ fun AuthScreen(
     onAuthSuccess: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val email by viewModel.email.collectAsState()
-    val password by viewModel.password.collectAsState()
-    val isSignUp by viewModel.isSignUp.collectAsState()
-
-    var passwordVisible by remember { mutableStateOf(false) }
-    val focusManager = LocalFocusManager.current
     val scrollState = rememberScrollState()
 
     LaunchedEffect(uiState) {
@@ -96,16 +67,16 @@ fun AuthScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(scrollState)
-                .padding(horizontal = 24.dp, vertical = 16.dp),
+                .padding(horizontal = 24.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Top
+            verticalArrangement = Arrangement.Center
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             // App Logo Icon
             Box(
                 modifier = Modifier
-                    .size(72.dp)
+                    .size(80.dp)
                     .clip(CircleShape)
                     .background(TealContainer),
                 contentAlignment = Alignment.Center
@@ -114,11 +85,11 @@ fun AuthScreen(
                     imageVector = Icons.Default.MedicalServices,
                     contentDescription = "Mediwell Logo",
                     tint = TealOnContainer,
-                    modifier = Modifier.size(40.dp)
+                    modifier = Modifier.size(44.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             Text(
                 text = "Mediwell",
@@ -127,7 +98,7 @@ fun AuthScreen(
                 fontWeight = FontWeight.Bold
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             Text(
                 text = "Medication Safety & Plain-Language Intelligence",
@@ -136,9 +107,9 @@ fun AuthScreen(
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(36.dp))
 
-            // Auth Card
+            // Auth Card - Google Sign-In Only
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 shape = RoundedCornerShape(16.dp),
@@ -148,82 +119,29 @@ fun AuthScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(20.dp)
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Sign In / Register Tabs
-                    TabRow(
-                        selectedTabIndex = if (isSignUp) 1 else 0,
-                        containerColor = Color.Transparent,
-                        contentColor = TealPrimary
-                    ) {
-                        Tab(
-                            selected = !isSignUp,
-                            onClick = { viewModel.setAuthMode(false) },
-                            text = { Text("Sign In", fontWeight = FontWeight.SemiBold) }
-                        )
-                        Tab(
-                            selected = isSignUp,
-                            onClick = { viewModel.setAuthMode(true) },
-                            text = { Text("Create Account", fontWeight = FontWeight.SemiBold) }
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // Email Field
-                    OutlinedTextField(
-                        value = email,
-                        onValueChange = { viewModel.updateEmail(it) },
-                        label = { Text("Email Address") },
-                        placeholder = { Text("patient@example.com") },
-                        leadingIcon = {
-                            Icon(Icons.Default.Email, contentDescription = null, tint = TealPrimary)
-                        },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Email,
-                            imeAction = ImeAction.Next
-                        ),
-                        modifier = Modifier.fillMaxWidth()
+                    Text(
+                        text = "Sign in to your account",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                    // Password Field
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { viewModel.updatePassword(it) },
-                        label = { Text("Password") },
-                        placeholder = { Text(if (isSignUp) "At least 6 characters" else "Your password") },
-                        leadingIcon = {
-                            Icon(Icons.Default.Lock, contentDescription = null, tint = TealPrimary)
-                        },
-                        trailingIcon = {
-                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                Icon(
-                                    imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                    contentDescription = if (passwordVisible) "Hide password" else "Show password"
-                                )
-                            }
-                        },
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Password,
-                            imeAction = ImeAction.Done
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onDone = {
-                                focusManager.clearFocus()
-                                viewModel.submitEmailAuth()
-                            }
-                        ),
-                        modifier = Modifier.fillMaxWidth()
+                    Text(
+                        text = "Access your verified prescriptions, safety alerts, and personalized interaction reports.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                        textAlign = TextAlign.Center
                     )
+
+                    Spacer(modifier = Modifier.height(24.dp))
 
                     // Error Message Banner
                     if (uiState is AuthUiState.Error) {
-                        Spacer(modifier = Modifier.height(12.dp))
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -231,7 +149,7 @@ fun AuthScreen(
                                     color = Color(0xFFFFEBEE),
                                     shape = RoundedCornerShape(8.dp)
                                 )
-                                .padding(10.dp)
+                                .padding(12.dp)
                         ) {
                             Text(
                                 text = (uiState as AuthUiState.Error).message,
@@ -239,20 +157,16 @@ fun AuthScreen(
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
 
-                    Spacer(modifier = Modifier.height(18.dp))
-
-                    // Submit Button (Email/Password)
+                    // Google Sign-In Button (Primary & Sole Auth Action)
                     Button(
-                        onClick = {
-                            focusManager.clearFocus()
-                            viewModel.submitEmailAuth()
-                        },
+                        onClick = { viewModel.signInWithGoogle(Config.googleClientId) },
                         enabled = uiState !is AuthUiState.Loading,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(50.dp),
+                            .height(52.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = TealPrimary)
                     ) {
@@ -262,72 +176,21 @@ fun AuthScreen(
                                 color = Color.White,
                                 strokeWidth = 2.dp
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Authenticating...")
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Connecting...", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                         } else {
                             Text(
-                                text = if (isSignUp) "Create Supabase Account" else "Sign In with Supabase",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold
+                                text = "Continue with Google",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White
                             )
                         }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Divider with "OR"
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFFE0E0E0))
-                        Text(
-                            text = "  OR  ",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFF888888)
-                        )
-                        HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFFE0E0E0))
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Google Sign-In Button
-                    OutlinedButton(
-                        onClick = { viewModel.signInWithGoogle(Config.googleClientId) },
-                        enabled = uiState !is AuthUiState.Loading,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(
-                            text = "Continue with Google",
-                            color = TealPrimary,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Demo / Prototype Bypass Button
-                    OutlinedButton(
-                        onClick = { viewModel.continueAsDemoUser() },
-                        enabled = uiState !is AuthUiState.Loading,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(
-                            text = "Explore Prototype (Direct Access)",
-                            color = MaterialTheme.colorScheme.secondary,
-                            style = MaterialTheme.typography.labelMedium
-                        )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             // Clinical Security Card
             Box(
@@ -366,7 +229,7 @@ fun AuthScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }

@@ -61,37 +61,46 @@ class MedicationViewModel(
 
     fun processOcr(base64Image: String) {
         viewModelScope.launch {
-            _entryState.value = MedicationEntryState.ScanningOcr
-            when (val result = OcrService.extractText(base64Image)) {
-                is AppResult.Success -> {
-                    val rawText = result.data
-                    val parsed = parseOcrText(rawText)
-                    val (extractedName, extractedDose, extractedFreq, extractedRoute) = parsed
+            try {
+                _entryState.value = MedicationEntryState.ScanningOcr
+                when (val result = OcrService.extractText(base64Image)) {
+                    is AppResult.Success -> {
+                        val rawText = result.data
+                        val parsed = parseOcrText(rawText)
+                        val (extractedName, extractedDose, extractedFreq, extractedRoute) = parsed
 
-                    // Pre-fill form with extracted OCR data and source = "ocr"
-                    _form.value = _form.value.copy(
-                        name      = extractedName.ifBlank { _form.value.name },
-                        dose      = extractedDose.ifBlank { _form.value.dose },
-                        frequency = extractedFreq.ifBlank { _form.value.frequency },
-                        route     = extractedRoute.ifBlank { _form.value.route },
-                        source    = "ocr"
-                    )
+                        // Pre-fill form with extracted OCR data and source = "ocr"
+                        _form.value = _form.value.copy(
+                            name      = extractedName.ifBlank { _form.value.name },
+                            dose      = extractedDose.ifBlank { _form.value.dose },
+                            frequency = extractedFreq.ifBlank { _form.value.frequency },
+                            route     = extractedRoute.ifBlank { _form.value.route },
+                            source    = "ocr"
+                        )
 
-                    // Persist scanned prescription OCR log in Supabase
-                    repository.saveScannedPrescription(
-                        userId = userId,
-                        rawOcrText = rawText,
-                        detectedName = extractedName.takeIf { it.isNotBlank() },
-                        detectedDose = extractedDose.takeIf { it.isNotBlank() },
-                        detectedFrequency = extractedFreq.takeIf { it.isNotBlank() }
-                    )
+                        // Persist scanned prescription OCR log in Supabase safely
+                        try {
+                            repository.saveScannedPrescription(
+                                userId = userId,
+                                rawOcrText = rawText,
+                                detectedName = extractedName.takeIf { it.isNotBlank() },
+                                detectedDose = extractedDose.takeIf { it.isNotBlank() },
+                                detectedFrequency = extractedFreq.takeIf { it.isNotBlank() }
+                            )
+                        } catch (repoErr: Throwable) {
+                            Log.w("MedicationViewModel", "Failed to persist OCR log to Supabase", repoErr)
+                        }
 
-                    _entryState.value = MedicationEntryState.Success("Prescription scanned! Please review details.")
+                        _entryState.value = MedicationEntryState.Success("Prescription scanned! Please review details.")
+                    }
+                    is AppResult.Error -> {
+                        _entryState.value = MedicationEntryState.Error(result.message)
+                    }
+                    is AppResult.Loading -> Unit
                 }
-                is AppResult.Error -> {
-                    _entryState.value = MedicationEntryState.Error(result.message)
-                }
-                is AppResult.Loading -> Unit
+            } catch (t: Throwable) {
+                Log.e("MedicationViewModel", "Unexpected exception during OCR handling", t)
+                _entryState.value = MedicationEntryState.Error("OCR processing error: ${t.localizedMessage ?: "Unknown failure"}")
             }
         }
     }

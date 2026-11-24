@@ -28,6 +28,7 @@ data class PatientViewReport(
     val totalMedicationsChecked: Int,
     val totalFindings: Int,
     val findings: List<PatientFindingCard>,
+    val medicationDetails: List<MedicationLabelInfo> = emptyList(),
     val fixedReferralNotice: String
 )
 
@@ -46,6 +47,7 @@ data class ClinicianViewReport(
     val generatedAt: String,
     val medications: List<ClinicianMedicationItem>,
     val findings: List<ClinicianFindingItem>,
+    val medicationDetails: List<MedicationLabelInfo> = emptyList(),
     val disclaimer: String
 )
 

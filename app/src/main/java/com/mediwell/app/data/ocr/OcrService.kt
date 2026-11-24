@@ -14,18 +14,28 @@ import kotlinx.serialization.json.Json
 
 /**
  * Service that calls OCR.space free REST API to extract raw text from a base64-encoded image.
- * Uses BuildConfig.OCR_API_KEY.
+ * Protected with comprehensive error handling to guarantee crashes are never propagated.
  */
 object OcrService {
+    private const val TAG = "OcrService"
     private val client = HttpClient()
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json { 
+        ignoreUnknownKeys = true 
+        isLenient = true
+        coerceInputValues = true
+    }
 
     suspend fun extractText(base64Image: String): AppResult<String> {
-        val apiKey = BuildConfig.OCR_API_KEY
-        if (apiKey.isBlank() || apiKey == "OCR_API_KEY_PLACEHOLDER") {
-            return AppResult.Error("OCR API key is not configured. Set OCR_API_KEY in local.properties.")
-        }
         return try {
+            val apiKey = BuildConfig.OCR_API_KEY
+            if (apiKey.isBlank() || apiKey == "OCR_API_KEY_PLACEHOLDER") {
+                return AppResult.Error("OCR API key is not configured. Set OCR_API_KEY in local.properties.")
+            }
+
+            if (base64Image.isBlank()) {
+                return AppResult.Error("Image data was empty. Please select a clear photo of the prescription.")
+            }
+
             val formattedBase64 = if (!base64Image.startsWith("data:image")) {
                 "data:image/jpeg;base64,$base64Image"
             } else {
@@ -45,22 +55,32 @@ object OcrService {
             )
 
             val responseBody = httpResponse.bodyAsText()
-            val parsed = json.decodeFromString<OcrSpaceResponse>(responseBody)
+            Log.d(TAG, "OCR response status: ${httpResponse.status}, body length: ${responseBody.length}")
 
-            if (parsed.isErroredOnProcessing == true || parsed.errorMessage != null) {
-                val errorMsg = parsed.errorMessage?.joinToString(", ") ?: "OCR processing failed"
+            val parsed = try {
+                json.decodeFromString<OcrSpaceResponse>(responseBody)
+            } catch (jsonErr: Throwable) {
+                Log.e(TAG, "Failed to parse OCR response JSON: $responseBody", jsonErr)
+                return AppResult.Error("Could not read response from OCR service. Please try again.")
+            }
+
+            if (parsed.isErroredOnProcessing == true || !parsed.errorMessage.isNullOrEmpty()) {
+                val errorMsg = parsed.errorMessage?.filter { it.isNotBlank() }?.joinToString(", ")
+                    ?: parsed.errorDetails
+                    ?: "OCR processing failed"
+                Log.w(TAG, "OCR returned processing error: $errorMsg")
                 AppResult.Error(errorMsg)
             } else {
                 val parsedText = parsed.parsedResults?.firstOrNull()?.parsedText
                 if (parsedText.isNullOrBlank()) {
-                    AppResult.Error("No text detected in the prescription image.")
+                    AppResult.Error("No text detected in the prescription image. Try capturing in better lighting.")
                 } else {
                     AppResult.Success(parsedText)
                 }
             }
-        } catch (e: Exception) {
-            Log.e("OcrService", "OCR failed", e)
-            AppResult.Error("OCR request failed: ${e.message ?: "Unknown error"}")
+        } catch (e: Throwable) {
+            Log.e(TAG, "Fatal OCR exception caught safely", e)
+            AppResult.Error("Unable to scan prescription: ${e.localizedMessage ?: "Network or processing error"}")
         }
     }
 }

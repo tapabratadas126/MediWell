@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LocalPharmacy
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
@@ -46,6 +47,7 @@ import com.mediwell.app.data.model.ClinicianMedicationItem
 import com.mediwell.app.data.model.ClinicianViewReport
 import com.mediwell.app.data.model.ConfidenceLevel
 import com.mediwell.app.data.model.FindingSeverity
+import com.mediwell.app.data.model.MedicationLabelInfo
 import com.mediwell.app.data.model.PatientFindingCard
 import com.mediwell.app.data.model.PatientViewReport
 import com.mediwell.app.ui.components.AppTopBar
@@ -238,6 +240,38 @@ private fun PatientViewContent(report: PatientViewReport) {
         } else {
             items(report.findings, key = { it.findingKey }) { finding ->
                 PatientFindingItemCard(finding)
+            }
+        }
+
+        // Per-Medicine Information Section (DailyMed / openFDA Structured Label Data)
+        if (report.medicationDetails.isNotEmpty()) {
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.LocalPharmacy,
+                        contentDescription = null,
+                        tint = TealPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Medication Reference Guides (FDA / DailyMed)",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Official label information retrieved from openFDA / DailyMed structured product inserts.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+            }
+
+            items(report.medicationDetails, key = { it.medicineName }) { medInfo ->
+                MedicationLabelCard(medInfo)
             }
         }
 
@@ -453,6 +487,117 @@ private fun ClinicianFindingCard(finding: ClinicianFindingItem) {
                     color = if (finding.confidence == "verified") VerifiedGreen else CriticalRed
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun MedicationLabelCard(info: MedicationLabelInfo) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = info.medicineName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "Official Label",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TealPrimary,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Purpose / Function
+            Text(
+                text = "Purpose & Indications",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = info.purpose,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF2C3E44)
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Typical Adult Dosage Range
+            Text(
+                text = "Typical Adult Dosage Range",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "General reference — not a prescription",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF7A858A),
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = info.typicalDosage,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF2C3E44)
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // How it should be taken
+            Text(
+                text = "How It Should Be Taken",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = info.administrationGuide,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF2C3E44)
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Precautions / Warnings
+            Text(
+                text = "Precautions & Warnings (Official FDA Label)",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFFC62828)
+            )
+            Text(
+                text = info.warningsAndPrecautions,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF2C3E44)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+            HorizontalDivider(color = Color(0xFFF0F3F4), thickness = 0.5.dp)
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = "Source: ${info.source}",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF888888)
+            )
         }
     }
 }
