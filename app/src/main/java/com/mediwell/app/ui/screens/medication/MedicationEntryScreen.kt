@@ -215,7 +215,7 @@ fun MedicationEntryScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Enter each drug name, dose, frequency, and route, or scan your prescription using OCR. Mediwell normalizes names via RxNorm & checks for interactions.",
+                            text = "Enter each drug name, dose, frequency, and route, or scan your prescription using OCR. MEDCHCK normalizes names via RxNorm & checks for interactions.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = TealOnContainer
                         )

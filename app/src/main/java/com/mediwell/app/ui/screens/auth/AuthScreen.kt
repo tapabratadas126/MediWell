@@ -106,7 +106,7 @@ fun AuthScreen(
             ) {
                 Icon(
                     imageVector = Icons.Default.MedicalServices,
-                    contentDescription = "Mediwell Logo",
+                    contentDescription = "MEDCHCK Logo",
                     tint = TealOnContainer,
                     modifier = Modifier.size(40.dp)
                 )
@@ -115,7 +115,7 @@ fun AuthScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Mediwell",
+                text = "MEDCHCK",
                 style = MaterialTheme.typography.headlineLarge,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold

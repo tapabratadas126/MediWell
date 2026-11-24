@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Mediwell</string>
+    <string name="app_name">MEDCHCK</string>
     <string name="disclaimer_referral">Always consult a qualified pharmacist or doctor before changing or stopping any medication.</string>
     <string name="google_sign_in">Sign in with Google</string>
     <string name="medication_safety_subtitle">Medication Safety &amp; Plain-Language Safety Report</string>
