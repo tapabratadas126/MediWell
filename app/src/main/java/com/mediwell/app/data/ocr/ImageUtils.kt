@@ -47,7 +47,8 @@ object ImageUtils {
                 inPreferredConfig = Bitmap.Config.RGB_565
             }
 
-            val decodedBitmap: Bitmap? = contentResolver.openInputStream(uri)?.use { stream ->
+            val decodedStream = contentResolver.openInputStream(uri) ?: return null
+            val decodedBitmap: Bitmap = decodedStream.use { stream ->
                 BitmapFactory.decodeStream(stream, null, decodeOptions)
             } ?: return null
 

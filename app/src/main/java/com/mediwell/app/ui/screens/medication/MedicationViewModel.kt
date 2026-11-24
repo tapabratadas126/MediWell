@@ -1,5 +1,6 @@
 package com.mediwell.app.ui.screens.medication
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mediwell.app.data.model.MedicationInputForm
