@@ -126,3 +126,26 @@ data class CacheFindingsEntity(
     @SerialName("updated_at")
     val updatedAt: String? = null
 )
+
+/**
+ * Maps to `prescriptions` or `scanned_prescriptions` table in Supabase.
+ * Stores raw OCR scanning history and parsed medications.
+ */
+@Serializable
+data class ScannedPrescriptionEntity(
+    @SerialName("id")
+    val id: String,
+    @SerialName("user_id")
+    val userId: String,
+    @SerialName("raw_ocr_text")
+    val rawOcrText: String,
+    @SerialName("detected_medication_name")
+    val detectedMedicationName: String? = null,
+    @SerialName("detected_dose")
+    val detectedDose: String? = null,
+    @SerialName("detected_frequency")
+    val detectedFrequency: String? = null,
+    @SerialName("created_at")
+    val createdAt: String? = null
+)
+

@@ -1,5 +1,11 @@
 package com.mediwell.app.ui.screens.medication
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.util.Base64
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,6 +26,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.Search
@@ -37,6 +44,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -48,19 +56,24 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.mediwell.app.data.model.MedicationItem
 import com.mediwell.app.ui.components.AppTopBar
 import com.mediwell.app.ui.theme.TealContainer
 import com.mediwell.app.ui.theme.TealOnContainer
 import com.mediwell.app.ui.theme.TealPrimary
 import com.mediwell.app.ui.theme.VerifiedGreen
+import kotlinx.coroutines.launch
+import java.io.ByteArrayOutputStream
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -74,6 +87,33 @@ fun MedicationEntryScreen(
     val entryState by viewModel.entryState.collectAsState()
 
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    // Camera picture preview launcher
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap ->
+        if (bitmap != null) {
+            val outputStream = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream)
+            val base64 = Base64.encodeToString(outputStream.toByteArray(), Base64.DEFAULT)
+            viewModel.processOcr(base64)
+        }
+    }
+
+    // Runtime Permission Launcher for CAMERA
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            cameraLauncher.launch(null)
+        } else {
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar("Camera permission is required to scan prescriptions")
+            }
+        }
+    }
 
     LaunchedEffect(entryState) {
         when (entryState) {
@@ -130,10 +170,47 @@ fun MedicationEntryScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Enter each drug name, dose, frequency, and route. Mediwell normalizes names via RxNorm & checks for duplicates & interactions.",
+                            text = "Enter each drug name, dose, frequency, and route, or scan your prescription using OCR. Mediwell normalizes names via RxNorm & checks for interactions.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = TealOnContainer
                         )
+                    }
+                }
+            }
+
+            // OCR Scanning Action
+            item {
+                OutlinedButton(
+                    onClick = {
+                        val hasPermission = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.CAMERA
+                        ) == PackageManager.PERMISSION_GRANTED
+
+                        if (hasPermission) {
+                            cameraLauncher.launch(null)
+                        } else {
+                            permissionLauncher.launch(Manifest.permission.CAMERA)
+                        }
+                    },
+                    enabled = entryState !is MedicationEntryState.ScanningOcr && entryState !is MedicationEntryState.Normalizing,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    if (entryState is MedicationEntryState.ScanningOcr) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = TealPrimary,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Reading Prescription...")
+                    } else {
+                        Icon(Icons.Default.CameraAlt, contentDescription = "Camera", tint = TealPrimary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Scan Prescription with Camera (OCR)", color = TealPrimary, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -174,7 +251,7 @@ fun MedicationEntryScreen(
                             .padding(16.dp)
                     ) {
                         Text(
-                            text = "Manual Medication Entry",
+                            text = "Medication Details",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -226,7 +303,7 @@ fun MedicationEntryScreen(
                         // Add Button
                         Button(
                             onClick = { viewModel.addMedication() },
-                            enabled = form.isValid && entryState !is MedicationEntryState.Normalizing,
+                            enabled = form.isValid && entryState !is MedicationEntryState.Normalizing && entryState !is MedicationEntryState.ScanningOcr,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(48.dp),

@@ -64,7 +64,8 @@ data class MedicationInputForm(
     val name: String = "",
     val dose: String = "",
     val frequency: String = "Once daily",
-    val route: String = "Oral"
+    val route: String = "Oral",
+    val source: String = "manual_entry"
 ) {
     val isValid: Boolean
         get() = name.trim().length >= 2

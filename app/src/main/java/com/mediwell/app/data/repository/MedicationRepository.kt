@@ -90,7 +90,7 @@ class MedicationRepository(
                 dose = form.dose.trim(),
                 frequency = form.frequency.trim(),
                 route = form.route.trim(),
-                source = "manual_entry"
+                source = form.source
             )
 
             // Persist to Supabase if configured
@@ -234,6 +234,37 @@ class MedicationRepository(
                 Log.w(tag, "Failed to delete medication from Supabase: ${e.message}")
             }
         }
+    }
+
+    /**
+     * Store scanned prescription OCR results in Supabase `scanned_prescriptions` table.
+     */
+    suspend fun saveScannedPrescription(
+        userId: String,
+        rawOcrText: String,
+        detectedName: String? = null,
+        detectedDose: String? = null,
+        detectedFrequency: String? = null
+    ): AppResult<com.mediwell.app.data.model.ScannedPrescriptionEntity> = withContext(Dispatchers.IO) {
+        val entity = com.mediwell.app.data.model.ScannedPrescriptionEntity(
+            id = UUID.randomUUID().toString(),
+            userId = userId,
+            rawOcrText = rawOcrText,
+            detectedMedicationName = detectedName,
+            detectedDose = detectedDose,
+            detectedFrequency = detectedFrequency,
+            createdAt = null
+        )
+
+        if (Config.isSupabaseConfigured) {
+            try {
+                SupabaseClientProvider.postgrest.from("scanned_prescriptions").insert(entity)
+                Log.d(tag, "Successfully saved scanned prescription OCR log to Supabase: ${entity.id}")
+            } catch (e: Exception) {
+                Log.w(tag, "Failed to persist scanned prescription to Supabase: ${e.message}")
+            }
+        }
+        AppResult.Success(entity)
     }
 
     /**
