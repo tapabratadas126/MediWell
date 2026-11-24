@@ -25,6 +25,16 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Create local.properties from GitHub Secrets
+        run: |
+          cat << 'EOF' > local.properties
+          SUPABASE_URL=${{ secrets.SUPABASE_URL || 'https://zggutewsucelczxxxdpu.supabase.co' }}
+          SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY || 'sb_publishable_r2ELt7smORQ8Yaw5AFA7jQ_O0trUMQc' }}
+          GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+          OCR_API_KEY=${{ secrets.OCR_API_KEY || 'K8802107826848688957' }}
+          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID || 'YOUR_GOOGLE_WEB_CLIENT_ID_PLACEHOLDER' }}
+          EOF
+
       - name: Build MediWell APK
         run: |
           chmod +x gradlew
