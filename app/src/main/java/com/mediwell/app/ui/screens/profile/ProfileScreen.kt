@@ -184,7 +184,7 @@ fun ProfileScreen(viewModel: ProfileViewModel) {
             // ── Not-provided notice ───────────────────────────────────────────
             Surface(shape = RoundedCornerShape(10.dp), color = InfoBlueBg, modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    "ℹ️  Unanswered fields are shown as "Not provided". They are never interpreted as negative medical history.",
+                    "ℹ️  Unanswered fields are shown as \"Not provided\". They are never interpreted as negative medical history.",
                     modifier  = Modifier.padding(14.dp),
                     fontSize  = 11.sp,
                     color     = InfoBlue,
