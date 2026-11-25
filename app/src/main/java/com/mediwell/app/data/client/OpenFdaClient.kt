@@ -3,7 +3,6 @@ package com.mediwell.app.data.client
 import android.util.Log
 import com.mediwell.app.data.model.MedicationLabelInfo
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
 import io.ktor.client.engine.android.Android
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
@@ -21,9 +20,11 @@ import kotlinx.serialization.json.Json
 /**
  * Client for the free, public openFDA Drug Label API (SPL - Structured Product Labeling / DailyMed data).
  * Returns official FDA label sections for each medication:
- * - Purpose / Indications
- * - Dosage and Administration
- * - Warnings and Precautions
+ * - General uses
+ * - Official label instructions
+ * - Precautions and warnings
+ * - Age-related restrictions
+ * - Source and update information
  */
 class OpenFdaClient {
     private val tag = "OpenFdaClient"
@@ -40,7 +41,6 @@ class OpenFdaClient {
         }
     }
 
-    // In-memory cache to prevent redundant HTTP lookups
     private val labelCache = mutableMapOf<String, MedicationLabelInfo>()
 
     suspend fun fetchMedicationLabel(medicineName: String): MedicationLabelInfo = withContext(Dispatchers.IO) {
@@ -53,7 +53,6 @@ class OpenFdaClient {
         labelCache[cacheKey]?.let { return@withContext it }
 
         try {
-            // First try generic_name search, then brand_name search
             val label = queryOpenFda(cleanName)
             if (label != null) {
                 labelCache[cacheKey] = label
@@ -69,7 +68,6 @@ class OpenFdaClient {
     }
 
     private suspend fun queryOpenFda(drugName: String): MedicationLabelInfo? {
-        // Remove common dosage forms from search term (e.g., "Metformin 500mg" -> "Metformin")
         val sanitized = drugName.replace(Regex("""(?i)\b(\d+mg|\d+mcg|\d+ml|tab|tablet|cap|capsule|oral)\b"""), "").trim()
         val queryTerm = if (sanitized.isNotBlank()) sanitized else drugName
 
@@ -81,7 +79,6 @@ class OpenFdaClient {
         }
 
         if (response.status != HttpStatusCode.OK) {
-            // Fallback: search anywhere in label if specific openfda fields had no match
             val fallbackResponse: HttpResponse = httpClient.get("https://api.fda.gov/drug/label.json") {
                 parameter("search", "\"$queryTerm\"")
                 parameter("limit", "1")
@@ -102,43 +99,68 @@ class OpenFdaClient {
     private fun buildLabelInfo(drugName: String, result: OpenFdaLabelResult): MedicationLabelInfo {
         val purposeText = result.purpose?.firstOrNull()
             ?: result.indicationsAndUsage?.firstOrNull()
-            ?: "Prescription medication indicated according to FDA approved labeling."
+            ?: "Used as directed by a doctor for its approved medical purpose."
 
         val dosageText = result.dosageAndAdministration?.firstOrNull()
-            ?: "Follow the exact dosage regimen directed by your healthcare provider."
+            ?: "Follow the exact dose and schedule prescribed by your doctor."
 
-        val warningsText = result.warnings?.firstOrNull()
+        val warningsText = result.boxedWarning?.firstOrNull()
             ?: result.warningsAndCautions?.firstOrNull()
-            ?: result.boxedWarning?.firstOrNull()
-            ?: "Consult your physician or pharmacist regarding specific contraindications and safety advisories."
+            ?: result.warnings?.firstOrNull()
+            ?: "Check with your doctor or pharmacist about possible side effects and precautions."
+
+        val ageText = buildAgeRestrictionText(result.pediatricUse?.firstOrNull(), result.geriatricUse?.firstOrNull())
+
+        val formattedDate = result.effectiveTime?.let { raw ->
+            if (raw.length == 8) "${raw.substring(0, 4)}-${raw.substring(4, 6)}-${raw.substring(6, 8)}" else raw
+        } ?: "Official product label"
 
         return MedicationLabelInfo(
             medicineName = drugName,
-            purpose = cleanText(purposeText, maxLength = 280),
-            typicalDosage = cleanText(dosageText, maxLength = 300),
+            purpose = cleanText(purposeText, maxLength = 240),
+            typicalDosage = cleanText(dosageText, maxLength = 260),
             administrationGuide = extractAdministrationTips(dosageText),
-            warningsAndPrecautions = cleanText(warningsText, maxLength = 320),
-            source = "openFDA / DailyMed (Official FDA Drug Label)"
+            warningsAndPrecautions = cleanText(warningsText, maxLength = 280),
+            ageRestrictions = ageText,
+            lastUpdated = "Label effective: $formattedDate",
+            source = "Official Product Label (FDA / DailyMed)"
         )
+    }
+
+    private fun buildAgeRestrictionText(pediatric: String?, geriatric: String?): String {
+        val parts = mutableListOf<String>()
+        if (!pediatric.isNullOrBlank()) {
+            parts.add("Children: " + cleanText(pediatric, maxLength = 150))
+        }
+        if (!geriatric.isNullOrBlank()) {
+            parts.add("Older adults: " + cleanText(geriatric, maxLength = 150))
+        }
+        return if (parts.isEmpty()) {
+            "No specific age restriction highlighted in this summary; confirm suitability for children or older adults with a doctor or pharmacist."
+        } else {
+            parts.joinToString("\n")
+        }
     }
 
     private fun extractAdministrationTips(dosageText: String): String {
         return when {
             dosageText.contains("with food", ignoreCase = true) || dosageText.contains("with meal", ignoreCase = true) ->
-                "Take with food or meals to optimize absorption and minimize gastrointestinal upset."
+                "Take with food or a meal to help absorption and reduce stomach upset."
             dosageText.contains("empty stomach", ignoreCase = true) || dosageText.contains("before meals", ignoreCase = true) ->
-                "Take on an empty stomach (typically 1 hour before or 2 hours after meals) with a full glass of water."
+                "Take on an empty stomach (about 1 hour before or 2 hours after eating) with water."
             dosageText.contains("bedtime", ignoreCase = true) || dosageText.contains("evening", ignoreCase = true) ->
-                "Commonly taken in the evening or at bedtime as advised by your physician."
+                "Often taken in the evening or at bedtime, as directed by your doctor."
             else ->
-                "Take with a full glass of water at consistent times each day as directed on your prescription label."
+                "Take with a full glass of water at consistent times each day, following your prescription."
         }
     }
 
     private fun cleanText(text: String, maxLength: Int): String {
         val singleLine = text.replace(Regex("""\s+"""), " ").trim()
-        // Strip common SPL section headers like "1 INDICATIONS AND USAGE"
-        val stripped = singleLine.replace(Regex("""^(\d+\s+[A-Z\s]+:|\bINDICATIONS AND USAGE\b|\bDOSAGE AND ADMINISTRATION\b|\bWARNINGS AND PRECAUTIONS\b)[:\s]*"""), "")
+        val stripped = singleLine.replace(
+            Regex("""^(\d+\s+[A-Z\s]+:|\bINDICATIONS AND USAGE\b|\bDOSAGE AND ADMINISTRATION\b|\bWARNINGS AND PRECAUTIONS\b|\bPEDIATRIC USE\b|\bGERIATRIC USE\b)[:\s]*"""),
+            ""
+        ).trim()
         return if (stripped.length > maxLength) {
             stripped.take(maxLength).substringBeforeLast(" ") + "..."
         } else {
@@ -149,11 +171,13 @@ class OpenFdaClient {
     private fun defaultLabelInfo(drugName: String): MedicationLabelInfo {
         return MedicationLabelInfo(
             medicineName = drugName,
-            purpose = "Prescription medication prescribed by your physician for therapeutic treatment.",
-            typicalDosage = "Follow your prescribing physician's personalized dosage instructions precisely.",
-            administrationGuide = "Take orally with a full glass of water at scheduled intervals as directed on your prescription package.",
-            warningsAndPrecautions = "Inform your healthcare professional about all current medications, allergies, and existing medical conditions before use.",
-            source = "Clinical Reference Standard"
+            purpose = "Prescribed for treatment as directed by your doctor.",
+            typicalDosage = "Follow your personal prescription instructions carefully.",
+            administrationGuide = "Take with a full glass of water at your scheduled times.",
+            warningsAndPrecautions = "Tell your doctor or pharmacist about all other medicines, allergies, and health conditions before use.",
+            ageRestrictions = "Confirm suitability for children or older adults with your doctor or pharmacist.",
+            lastUpdated = "Standard clinical reference",
+            source = "General Medication Reference"
         )
     }
 }
@@ -170,5 +194,8 @@ private data class OpenFdaLabelResult(
     @SerialName("dosage_and_administration") val dosageAndAdministration: List<String>? = null,
     @SerialName("warnings") val warnings: List<String>? = null,
     @SerialName("warnings_and_cautions") val warningsAndCautions: List<String>? = null,
-    @SerialName("boxed_warning") val boxedWarning: List<String>? = null
+    @SerialName("boxed_warning") val boxedWarning: List<String>? = null,
+    @SerialName("pediatric_use") val pediatricUse: List<String>? = null,
+    @SerialName("geriatric_use") val geriatricUse: List<String>? = null,
+    @SerialName("effective_time") val effectiveTime: String? = null
 )

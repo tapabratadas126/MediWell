@@ -27,6 +27,8 @@ data class PatientViewReport(
     val generatedAt: String,
     val totalMedicationsChecked: Int,
     val totalFindings: Int,
+    val allergiesAssessedCount: Int = 0,
+    val allergyAssessmentNote: String = "Not assessed — no allergies recorded in your profile.",
     val findings: List<PatientFindingCard>,
     val medicationDetails: List<MedicationLabelInfo> = emptyList(),
     val fixedReferralNotice: String
@@ -36,9 +38,13 @@ data class PatientViewReport(
 data class PatientFindingCard(
     val findingKey: String,
     val title: String,
+    val issue: String = "",
     val plainLanguageExplanation: String,
-    val confidenceBadge: String, // "Verified" or "Needs Review"
-    val severityBadge: String, // "High Risk", "Warning", "Informational"
+    val whatToDo: String = "Discuss this finding with your doctor or pharmacist before making any changes.",
+    val confidenceBadge: String, // "Verified" or "Needs Confirmation"
+    val severityBadge: String,   // "High Risk", "Warning", "Informational"
+    val sourceLabel: String = "Reference information found",
+    val additionalDetails: String = "",
     val involvedMedications: List<String>
 )
 
@@ -47,6 +53,7 @@ data class ClinicianViewReport(
     val generatedAt: String,
     val medications: List<ClinicianMedicationItem>,
     val findings: List<ClinicianFindingItem>,
+    val recordedAllergies: List<AllergyRecord> = emptyList(),
     val medicationDetails: List<MedicationLabelInfo> = emptyList(),
     val disclaimer: String
 )

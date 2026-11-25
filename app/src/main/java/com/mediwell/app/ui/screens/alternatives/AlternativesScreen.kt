@@ -70,7 +70,7 @@ fun AlternativesScreen(
                             color = TextPrimary
                         )
                         Spacer(Modifier.height(6.dp))
-                        StatusBadge("Equivalence check via RxNorm", bgColor = SageGreen, textColor = ForestGreen)
+                        StatusBadge("Active ingredient reference check", bgColor = SageGreen, textColor = ForestGreen)
                         Spacer(Modifier.height(10.dp))
                         Text(
                             "Generic equivalence and local pricing information will appear here when connected to your active prescription.",

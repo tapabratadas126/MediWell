@@ -33,6 +33,7 @@ enum class FindingType(val dbValue: String, val label: String) {
     DUPLICATE_INGREDIENT("duplicate_ingredient", "Duplicate Ingredient"),
     DRUG_INTERACTION("drug_interaction", "Drug Interaction"),
     QT_RISK("qt_risk", "QT Prolongation Risk"),
+    ALLERGY_MATCH("allergy_match", "Allergy Risk"),
     UNKNOWN("unknown", "Safety Notice");
 
     companion object {

@@ -186,6 +186,9 @@ class GeminiClient {
             FindingType.QT_RISK -> {
                 "${finding.drugName1} and ${finding.drugName2 ?: "your other medication"} are known to affect heart rhythm (QT interval). Using them together requires medical monitoring."
             }
+            FindingType.ALLERGY_MATCH -> {
+                "${finding.mechanismOrDetail} Do not take this medicine until you confirm it is safe with your doctor or pharmacist."
+            }
             FindingType.UNKNOWN -> {
                 "A potential safety notice was identified for ${finding.drugName1}: ${finding.mechanismOrDetail}"
             }

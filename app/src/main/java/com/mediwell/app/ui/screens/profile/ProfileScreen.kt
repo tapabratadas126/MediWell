@@ -13,26 +13,43 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mediwell.app.data.model.AllergyRecord
 import com.mediwell.app.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(viewModel: ProfileViewModel) {
     val profile   by viewModel.profile.collectAsState()
+    val allergies by viewModel.allergies.collectAsState()
     val saveState by viewModel.saveState.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
 
     val snackbarHostState = remember { SnackbarHostState() }
+    var editingAllergy by remember { mutableStateOf<AllergyRecord?>(null) }
+    var showAllergyDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(saveState) {
-        when (saveState) {
-            is ProfileSaveState.Success ->
-                snackbarHostState.showSnackbar("Profile saved successfully")
-            is ProfileSaveState.Error ->
-                snackbarHostState.showSnackbar((saveState as ProfileSaveState.Error).message)
+        when (val s = saveState) {
+            is ProfileSaveState.Success -> snackbarHostState.showSnackbar(s.message)
+            is ProfileSaveState.Error   -> snackbarHostState.showSnackbar(s.message)
             else -> Unit
         }
         if (saveState !is ProfileSaveState.Idle) viewModel.clearSaveState()
+    }
+
+    if (showAllergyDialog) {
+        AllergyEditorDialog(
+            initial = editingAllergy,
+            onDismiss = {
+                showAllergyDialog = false
+                editingAllergy = null
+            },
+            onSave = { name, reaction, severity ->
+                viewModel.saveAllergy(editingAllergy?.id, name, reaction, severity)
+                showAllergyDialog = false
+                editingAllergy = null
+            }
+        )
     }
 
     Scaffold(
@@ -87,16 +104,69 @@ fun ProfileScreen(viewModel: ProfileViewModel) {
                 )
             }
 
+            // ── Known Allergies (Saved directly & checked in Safety Reviews) ──
+            ProfileSection(title = "Known Allergies", icon = Icons.Default.WarningAmber) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Saved allergies are automatically checked during every medication safety review.",
+                        fontSize = 12.sp,
+                        color = TextSecondary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    FilledTonalButton(
+                        onClick = {
+                            editingAllergy = null
+                            showAllergyDialog = true
+                        },
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = SageGreen,
+                            contentColor = ForestGreen
+                        )
+                    ) {
+                        Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Add", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                if (allergies.isEmpty()) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = Ivory,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            "Not provided — no allergies recorded yet. If you have any medicine or ingredient allergies, tap Add above.",
+                            modifier = Modifier.padding(12.dp),
+                            fontSize = 12.sp,
+                            color = TextTertiary
+                        )
+                    }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        allergies.forEach { record ->
+                            AllergyItemRow(
+                                record = record,
+                                onEdit = {
+                                    editingAllergy = record
+                                    showAllergyDialog = true
+                                },
+                                onDelete = { viewModel.deleteAllergy(record) }
+                            )
+                        }
+                    }
+                }
+            }
+
             // ── Health information section ─────────────────────────────────────
             ProfileSection(title = "Health Information", icon = Icons.Default.HealthAndSafety) {
-                ChipListEditor(
-                    sectionLabel = "Known Allergies",
-                    notKnownHint = "Tap + to add an allergy. Leave empty only if genuinely not known.",
-                    items        = profile.allergies,
-                    onAdd        = viewModel::addAllergy,
-                    onRemove     = viewModel::removeAllergy
-                )
-                Spacer(Modifier.height(14.dp))
                 ChipListEditor(
                     sectionLabel = "Medical Conditions",
                     notKnownHint = "Tap + to add a condition. Leave empty only if genuinely not known.",
@@ -210,6 +280,134 @@ fun ProfileScreen(viewModel: ProfileViewModel) {
             Spacer(Modifier.height(16.dp))
         }
     }
+}
+
+@Composable
+private fun AllergyItemRow(
+    record: AllergyRecord,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = SageGreen,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        record.allergenName,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                        color = ForestGreen
+                    )
+                    if (record.severity.isNotBlank() && record.severity != "Not specified") {
+                        Spacer(Modifier.width(8.dp))
+                        val (bg, fg) = when (record.severity.lowercase()) {
+                            "severe"   -> CriticalRedBg to CriticalRed
+                            "moderate" -> ReviewAmberBg to ReviewAmber
+                            else       -> White to ForestGreen
+                        }
+                        Surface(shape = RoundedCornerShape(4.dp), color = bg) {
+                            Text(
+                                record.severity,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = fg
+                            )
+                        }
+                    }
+                }
+                if (!record.reaction.isNullOrBlank()) {
+                    Text(
+                        "Reaction: ${record.reaction}",
+                        fontSize = 12.sp,
+                        color = TextSecondary
+                    )
+                }
+            }
+            IconButton(onClick = onEdit, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Default.Edit, "Edit allergy", tint = ForestGreen, modifier = Modifier.size(18.dp))
+            }
+            IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Default.DeleteOutline, "Delete allergy", tint = CriticalRed, modifier = Modifier.size(18.dp))
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AllergyEditorDialog(
+    initial: AllergyRecord?,
+    onDismiss: () -> Unit,
+    onSave: (name: String, reaction: String, severity: String) -> Unit
+) {
+    var name by remember { mutableStateOf(initial?.allergenName ?: "") }
+    var reaction by remember { mutableStateOf(initial?.reaction ?: "") }
+    var severity by remember { mutableStateOf(initial?.severity ?: "Not specified") }
+    val severityOptions = listOf("Mild", "Moderate", "Severe", "Not specified")
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = White,
+        title = {
+            Text(
+                if (initial == null) "Add Allergy" else "Edit Allergy",
+                fontWeight = FontWeight.SemiBold,
+                color = ForestGreen
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Allergen / Medicine Name *") },
+                    placeholder = { Text("e.g., Penicillin, Sulfa, Ibuprofen") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = reaction,
+                    onValueChange = { reaction = it },
+                    label = { Text("Reported Reaction (optional)") },
+                    placeholder = { Text("e.g., Rash, hives, swelling") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text("Severity", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = TextSecondary)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    severityOptions.forEach { opt ->
+                        FilterChip(
+                            selected = severity == opt,
+                            onClick = { severity = opt },
+                            label = { Text(opt, fontSize = 11.sp) }
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onSave(name, reaction, severity) },
+                enabled = name.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = ForestGreen)
+            ) {
+                Text("Save", color = White)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = TextSecondary)
+            }
+        }
+    )
 }
 
 @Composable

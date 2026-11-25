@@ -144,7 +144,7 @@ private fun MedicineCard(med: MedicationItem) {
                         color = VerifiedGreenBg
                     ) {
                         Text(
-                            "RxNorm verified",
+                            "Active ingredient confirmed",
                             modifier  = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             fontSize  = 10.sp,
                             color     = VerifiedGreen,

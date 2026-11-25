@@ -2,6 +2,7 @@ package com.mediwell.app.data.repository
 
 import android.util.Log
 import com.mediwell.app.data.client.SupabaseClientProvider
+import com.mediwell.app.data.model.AllergyRecord
 import com.mediwell.app.data.model.ConfidenceLevel
 import com.mediwell.app.data.model.FindingEntity
 import com.mediwell.app.data.model.FindingSeverity
@@ -31,32 +32,114 @@ class SafetyEngineRepository {
     private val tag = "SafetyEngine"
 
     /**
-     * Run the complete safety check across active medications.
+     * Run the complete safety check across active medications and recorded patient allergies.
      */
     suspend fun runSafetyAnalysis(
         userId: String,
-        medications: List<MedicationItem>
+        medications: List<MedicationItem>,
+        allergies: List<AllergyRecord> = emptyList()
     ): List<SafetyFinding> = withContext(Dispatchers.IO) {
         if (medications.isEmpty()) return@withContext emptyList()
 
         val findings = mutableListOf<SafetyFinding>()
 
-        // 1. Check for Duplicate Active Ingredients
+        // 1. Check prescribed medications against recorded patient allergies
+        if (allergies.isNotEmpty()) {
+            findings.addAll(checkAllergies(medications, allergies))
+        }
+
+        // 2. Check for Duplicate Active Ingredients
         val duplicateFindings = checkDuplicateIngredients(medications)
         findings.addAll(duplicateFindings)
 
-        // 2. Check for Drug-Drug Interactions (Pairwise)
+        // 3. Check for Drug-Drug Interactions (Pairwise)
         if (medications.size >= 2) {
             val interactionFindings = checkDrugInteractions(medications)
             findings.addAll(interactionFindings)
         }
 
-        // 3. Persist findings to Supabase `findings` table if configured
+        // 4. Persist findings to Supabase `findings` table if configured
         if (Config.isSupabaseConfigured && findings.isNotEmpty()) {
             persistFindingsToSupabase(userId, medications, findings)
         }
 
         findings
+    }
+
+    /**
+     * Deterministic check of prescribed medications and active ingredients against recorded patient allergies.
+     * Distinguishes exact ingredient/name matches (VERIFIED) from drug-class matches (NEEDS_REVIEW).
+     */
+    private fun checkAllergies(
+        medications: List<MedicationItem>,
+        allergies: List<AllergyRecord>
+    ): List<SafetyFinding> {
+        val findings = mutableListOf<SafetyFinding>()
+        val allergyClassGroups = mapOf(
+            "penicillin" to setOf("penicillin", "amoxicillin", "ampicillin", "piperacillin", "augmentin", "amoxyclav"),
+            "cephalosporin" to setOf("cephalexin", "ceftriaxone", "cefixime", "cefuroxime", "cepodoxime", "ceftazidime"),
+            "sulfa" to setOf("sulfa", "sulfamethoxazole", "sulfasalazine", "bactrim", "septran", "cotrimoxazole", "furosemide", "celecoxib"),
+            "nsaid" to setOf("nsaid", "ibuprofen", "naproxen", "diclofenac", "aspirin", "aceclofenac", "ketorolac", "piroxicam", "mefenamic", "etoricoxib"),
+            "aspirin" to setOf("aspirin", "acetylsalicylic", "ecosprin", "disprin"),
+            "paracetamol" to setOf("paracetamol", "acetaminophen", "crocin", "dolo", "calpol"),
+            "macrolide" to setOf("azithromycin", "clarithromycin", "erythromycin"),
+            "fluoroquinolone" to setOf("ciprofloxacin", "levofloxacin", "ofloxacin", "moxifloxacin"),
+            "statin" to setOf("atorvastatin", "simvastatin", "rosuvastatin", "pravastatin")
+        )
+
+        for (med in medications) {
+            val medNameKey = canonicalizeDrugName(med.rawName)
+            val ingKey = med.normalizedIngredient?.let { canonicalizeDrugName(it) } ?: ""
+
+            for (allergy in allergies) {
+                val allergenKey = canonicalizeDrugName(allergy.allergenName)
+                if (allergenKey.isBlank()) continue
+
+                val exactMatch = medNameKey.contains(allergenKey) ||
+                    allergenKey.contains(medNameKey) ||
+                    (ingKey.isNotBlank() && (ingKey.contains(allergenKey) || allergenKey.contains(ingKey)))
+
+                val classMatch = !exactMatch && allergyClassGroups.values.any { group ->
+                    val allergenInGroup = group.any { allergenKey.contains(it) || it.contains(allergenKey) }
+                    val medInGroup = group.any {
+                        medNameKey.contains(it) || (ingKey.isNotBlank() && ingKey.contains(it))
+                    }
+                    allergenInGroup && medInGroup
+                }
+
+                if (exactMatch || classMatch) {
+                    val severity = when {
+                        allergy.severity.equals("Severe", ignoreCase = true) -> FindingSeverity.CRITICAL
+                        exactMatch -> FindingSeverity.CRITICAL
+                        else -> FindingSeverity.WARNING
+                    }
+                    val confidence = if (exactMatch) ConfidenceLevel.VERIFIED else ConfidenceLevel.NEEDS_REVIEW
+                    val reactionNote = allergy.reaction?.let { " Reported reaction: $it." } ?: ""
+                    val matchDetail = if (exactMatch) {
+                        "${med.rawName} matches your recorded allergy to ${allergy.allergenName}.$reactionNote"
+                    } else {
+                        "${med.rawName} belongs to the same medicine family as your recorded allergy to ${allergy.allergenName}.$reactionNote"
+                    }
+
+                    findings.add(
+                        SafetyFinding(
+                            findingKey = "allergy_${med.id}_${allergenKey}",
+                            drugName1 = med.rawName,
+                            drugName2 = allergy.allergenName,
+                            rxcui1 = med.matchedRxcui,
+                            type = FindingType.ALLERGY_MATCH,
+                            severity = severity,
+                            mechanismOrDetail = matchDetail,
+                            sourceCitation = "Patient Recorded Allergy Profile (${allergy.allergenName})",
+                            sourceTable = "patient_allergies",
+                            confidence = confidence,
+                            rephrasedBy = "deterministic_template"
+                        )
+                    )
+                }
+            }
+        }
+        return findings
     }
 
     /**

@@ -215,7 +215,7 @@ fun MedicationEntryScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Enter each drug name, dose, frequency, and route, or scan your prescription using OCR. MEDCHCK normalizes names via RxNorm & checks for interactions.",
+                            text = "Enter each medicine name, dose, frequency, and route, or scan your prescription. MEDCHCK checks medicine details and potential interactions.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = TealOnContainer
                         )
@@ -267,7 +267,7 @@ fun MedicationEntryScreen(
                         } else {
                             Icon(Icons.Default.CameraAlt, contentDescription = "Camera", tint = TealPrimary)
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Camera OCR", color = TealPrimary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Text("Scan Camera", color = TealPrimary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                         }
                     }
 
@@ -400,7 +400,7 @@ fun MedicationEntryScreen(
                                     strokeWidth = 2.dp
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Normalizing via RxNorm...")
+                                Text("Checking medicine details...")
                             } else {
                                 Icon(Icons.Default.Add, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))

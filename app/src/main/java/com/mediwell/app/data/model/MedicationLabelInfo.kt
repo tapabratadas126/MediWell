@@ -1,11 +1,10 @@
 package com.mediwell.app.data.model
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
  * Structured per-medicine information fetched from official FDA / DailyMed package inserts.
- * Contains purely deterministic label data (not LLM hallucinations).
+ * Contains purely deterministic label data (not LLM-generated).
  */
 @Serializable
 data class MedicationLabelInfo(
@@ -14,5 +13,7 @@ data class MedicationLabelInfo(
     val typicalDosage: String,
     val administrationGuide: String,
     val warningsAndPrecautions: String,
-    val source: String = "openFDA / DailyMed Structured Product Label (SPL)"
+    val ageRestrictions: String = "No specific age restriction noted in summary; check with a doctor or pharmacist for children or older adults.",
+    val lastUpdated: String = "Current official label",
+    val source: String = "Official Product Label (FDA / DailyMed)"
 )

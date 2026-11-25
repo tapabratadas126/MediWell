@@ -6,6 +6,7 @@ import com.mediwell.app.data.model.ClinicianViewReport
 import com.mediwell.app.data.model.MedicationItem
 import com.mediwell.app.data.model.PatientViewReport
 import com.mediwell.app.data.model.SafetyFinding
+import com.mediwell.app.data.repository.ProfileRepository
 import com.mediwell.app.data.repository.ReportRepository
 import com.mediwell.app.data.repository.SafetyEngineRepository
 import com.mediwell.app.util.AppResult
@@ -27,6 +28,7 @@ sealed class ReportUiState {
 class ReportViewModel(
     private val safetyEngineRepository: SafetyEngineRepository,
     private val reportRepository: ReportRepository,
+    private val profileRepository: ProfileRepository,
     private val userId: String,
     private val medications: List<MedicationItem>
 ) : ViewModel() {
@@ -49,11 +51,15 @@ class ReportViewModel(
         viewModelScope.launch {
             _uiState.value = ReportUiState.Loading
             try {
-                // Step 1: Run deterministic safety analysis
-                val findings = safetyEngineRepository.runSafetyAnalysis(userId, medications)
+                // Step 1: Fetch saved allergies from the backend so they actively inform the review
+                val allergyResult = profileRepository.fetchAllergies(userId)
+                val allergies = (allergyResult as? AppResult.Success)?.data ?: emptyList()
 
-                // Step 2: Generate report views with Gemini rephrasing + cache
-                when (val reportResult = reportRepository.generateSafetyReport(userId, medications, findings)) {
+                // Step 2: Run deterministic safety analysis (interactions, duplicates, allergies)
+                val findings = safetyEngineRepository.runSafetyAnalysis(userId, medications, allergies)
+
+                // Step 3: Generate structured dual-view report
+                when (val reportResult = reportRepository.generateSafetyReport(userId, medications, findings, allergies)) {
                     is AppResult.Success -> {
                         val (patientView, clinicianView) = reportResult.data
                         _uiState.value = ReportUiState.Ready(

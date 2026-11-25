@@ -4,10 +4,12 @@ import android.util.Log
 import com.mediwell.app.data.client.GeminiClient
 import com.mediwell.app.data.client.OpenFdaClient
 import com.mediwell.app.data.client.SupabaseClientProvider
+import com.mediwell.app.data.model.AllergyRecord
 import com.mediwell.app.data.model.CacheFindingsEntity
 import com.mediwell.app.data.model.ClinicianFindingItem
 import com.mediwell.app.data.model.ClinicianMedicationItem
 import com.mediwell.app.data.model.ClinicianViewReport
+import com.mediwell.app.data.model.ConfidenceLevel
 import com.mediwell.app.data.model.FindingSeverity
 import com.mediwell.app.data.model.FindingType
 import com.mediwell.app.data.model.MedicationItem
@@ -39,30 +41,18 @@ class ReportRepository(
         prettyPrint = true
     }
 
-    // In-memory cache for fast lookups
     private val localFindingSentenceCache = mutableMapOf<String, String>()
 
-    /**
-     * Generate the complete dual-view report (Patient + Clinician).
-     *
-     * Pipeline per finding:
-     * 1. Check `cache_findings` in Supabase
-     * 2. On miss: call Gemini API with ONLY that single finding
-     * 3. Cache the plain language result
-     * 4. Assemble report views
-     * 5. End with the fixed, non-editable referral disclaimer
-     * 6. Persist to `reports` table in Supabase
-     */
     suspend fun generateSafetyReport(
         userId: String,
         medications: List<MedicationItem>,
-        rawFindings: List<SafetyFinding>
+        rawFindings: List<SafetyFinding>,
+        allergies: List<AllergyRecord> = emptyList()
     ): AppResult<Pair<PatientViewReport, ClinicianViewReport>> = withContext(Dispatchers.IO) {
         try {
             val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
             val timestamp = dateFormat.format(Date())
 
-            // Rephrase each finding: check cache first, then Gemini (one finding at a time)
             val processedFindings = rawFindings.map { finding ->
                 val findingKey = computeFindingKey(finding)
                 val (sentence, rephrasedBy) = getOrRephraseSentence(finding, findingKey)
@@ -74,17 +64,24 @@ class ReportRepository(
                 )
             }
 
-            // Assemble Patient View
+            // Assemble structured, readable Patient View cards (no technical buzzwords)
             val patientFindingCards = processedFindings.map { finding ->
-                val involved = listOfNotNull(finding.drugName1, finding.drugName2)
-                val title = when (finding.type) {
+                val involved = when (finding.type) {
+                    FindingType.ALLERGY_MATCH -> listOf(finding.drugName1)
+                    else -> listOfNotNull(finding.drugName1, finding.drugName2)
+                }
+
+                val issueTitle = when (finding.type) {
+                    FindingType.ALLERGY_MATCH ->
+                        "Possible allergy match (${finding.drugName2 ?: "recorded allergy"})"
                     FindingType.DUPLICATE_INGREDIENT ->
-                        "Duplicate Medication Detected"
+                        "Duplicate active ingredient"
                     FindingType.DRUG_INTERACTION ->
-                        "Interaction: ${finding.drugName1} + ${finding.drugName2 ?: ""}"
+                        "Medicine interaction detected"
                     FindingType.QT_RISK ->
-                        "Heart Rhythm Precaution: ${finding.drugName1} + ${finding.drugName2 ?: ""}"
-                    else -> "Medication Safety Notice"
+                        "Heart rhythm precaution"
+                    FindingType.UNKNOWN ->
+                        "Medication safety notice"
                 }
 
                 val severityLabel = when (finding.severity) {
@@ -93,17 +90,47 @@ class ReportRepository(
                     FindingSeverity.INFO -> "Informational"
                 }
 
+                val statusLabel = when (finding.confidence) {
+                    ConfidenceLevel.VERIFIED -> "Verified"
+                    ConfidenceLevel.NEEDS_REVIEW -> "Needs Confirmation"
+                }
+
+                val sourceLabel = when (finding.type) {
+                    FindingType.ALLERGY_MATCH -> "Your saved allergy profile"
+                    else -> "Reference information found"
+                }
+
+                val whatToDo = when (finding.type) {
+                    FindingType.ALLERGY_MATCH ->
+                        "Do not take this medicine until you confirm it with your doctor or pharmacist."
+                    else ->
+                        "Discuss this finding with your doctor or pharmacist before changing any medicine."
+                }
+
                 PatientFindingCard(
                     findingKey = finding.findingKey,
-                    title = title,
+                    title = issueTitle,
+                    issue = issueTitle,
                     plainLanguageExplanation = finding.plainLanguageSentence,
-                    confidenceBadge = finding.confidence.label,
+                    whatToDo = whatToDo,
+                    confidenceBadge = statusLabel,
                     severityBadge = severityLabel,
+                    sourceLabel = sourceLabel,
+                    additionalDetails = finding.mechanismOrDetail,
                     involvedMedications = involved
                 )
             }
 
-            // Fetch official FDA/DailyMed label info per medicine (deterministic, not generated by LLM)
+            val allergyMatchesCount = processedFindings.count { it.type == FindingType.ALLERGY_MATCH }
+            val allergyNote = when {
+                allergies.isEmpty() ->
+                    "Not assessed — no allergies recorded in your profile."
+                allergyMatchesCount > 0 ->
+                    "Checked against ${allergies.size} recorded allergy/allergies — $allergyMatchesCount potential match(es) found."
+                else ->
+                    "Checked against ${allergies.size} recorded allergy/allergies — no relevant match found."
+            }
+
             val medicationLabelDetails = medications.map { med ->
                 openFdaClient.fetchMedicationLabel(med.normalizedIngredient ?: med.rawName)
             }
@@ -113,13 +140,14 @@ class ReportRepository(
                 generatedAt = timestamp,
                 totalMedicationsChecked = medications.size,
                 totalFindings = processedFindings.size,
+                allergiesAssessedCount = allergies.size,
+                allergyAssessmentNote = allergyNote,
                 findings = patientFindingCards,
                 medicationDetails = medicationLabelDetails,
-                // Fixed, non-editable referral line
                 fixedReferralNotice = Config.FIXED_REFERRAL_DISCLAIMER
             )
 
-            // Assemble Clinician View (with formal terminology, RxCUIs, mechanisms, and sources)
+            // Clinician View preserves RxCUIs, formal mechanisms, and technical citations
             val clinicianMeds = medications.map { med ->
                 ClinicianMedicationItem(
                     name = med.rawName,
@@ -147,11 +175,11 @@ class ReportRepository(
                 generatedAt = timestamp,
                 medications = clinicianMeds,
                 findings = clinicianFindings,
+                recordedAllergies = allergies,
                 medicationDetails = medicationLabelDetails,
                 disclaimer = Config.FIXED_REFERRAL_DISCLAIMER
             )
 
-            // Persist report to Supabase `reports` table
             if (Config.isSupabaseConfigured) {
                 try {
                     val reportEntity = ReportEntity(
@@ -174,9 +202,6 @@ class ReportRepository(
         }
     }
 
-    /**
-     * Compute a deterministic key for the finding to check cache_findings table.
-     */
     private fun computeFindingKey(finding: SafetyFinding): String {
         val d1 = finding.drugName1.lowercase().replace(Regex("[^a-z0-9]"), "")
         val d2 = (finding.drugName2 ?: "none").lowercase().replace(Regex("[^a-z0-9]"), "")
@@ -184,30 +209,20 @@ class ReportRepository(
         return "fnd_${finding.type.dbValue}_${finding.severity.dbValue}_$drugs"
     }
 
-    /**
-     * 1. Check local memory cache
-     * 2. Check Supabase `cache_findings`
-     * 3. On miss: call Gemini API (one finding only)
-     * 4. Cache and return
-     */
     private suspend fun getOrRephraseSentence(
         finding: SafetyFinding,
         findingKey: String
     ): Pair<String, String> {
-        // 1. Check memory cache
         localFindingSentenceCache[findingKey]?.let {
             return Pair(it, "cache")
         }
 
-        // 2. Check Supabase cache_findings table
         if (Config.isSupabaseConfigured) {
             try {
                 val cached = SupabaseClientProvider.postgrest
                     .from("cache_findings")
                     .select {
-                        filter {
-                            eq("finding_key", findingKey)
-                        }
+                        filter { eq("finding_key", findingKey) }
                     }
                     .decodeSingleOrNull<CacheFindingsEntity>()
 
@@ -220,14 +235,11 @@ class ReportRepository(
             }
         }
 
-        // 3. On cache miss: Call Gemini API with ONLY this one structured finding
         val generatedSentence = geminiClient.rephraseFinding(finding)
         val generator = if (Config.isGeminiConfigured) "gemini" else "deterministic_template"
 
-        // Store in memory cache
         localFindingSentenceCache[findingKey] = generatedSentence
 
-        // Write to Supabase cache_findings table if configured
         if (Config.isSupabaseConfigured) {
             try {
                 val cacheEntry = CacheFindingsEntity(

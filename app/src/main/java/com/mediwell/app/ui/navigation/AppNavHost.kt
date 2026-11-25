@@ -188,7 +188,7 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
                 val userId           = authRepository.getCurrentUserId()
                 val currentMedications = medicationRepository.medications.value
                 val vm: ReportViewModel = viewModel {
-                    ReportViewModel(safetyEngine, reportRepository, userId, currentMedications)
+                    ReportViewModel(safetyEngine, reportRepository, profileRepository, userId, currentMedications)
                 }
                 ReportScreen(viewModel = vm, onBack = { navController.popBackStack() })
             }

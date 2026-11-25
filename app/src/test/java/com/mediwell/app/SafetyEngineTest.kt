@@ -1,5 +1,6 @@
 package com.mediwell.app
 
+import com.mediwell.app.data.model.AllergyRecord
 import com.mediwell.app.data.model.ConfidenceLevel
 import com.mediwell.app.data.model.FindingSeverity
 import com.mediwell.app.data.model.FindingType
@@ -179,5 +180,40 @@ class SafetyEngineTest {
         val qtFinding = findings.find { it.type == FindingType.QT_RISK }
         assertNotNull("Should detect QT Prolongation risk", qtFinding)
         assertEquals(FindingSeverity.CRITICAL, qtFinding?.severity)
+    }
+
+    @Test
+    fun testAllergyExactAndClassMatchDetection() = runBlocking {
+        val medications = listOf(
+            MedicationItem(
+                id = "med_1",
+                userId = "user_1",
+                rawName = "Amoxicillin 500mg",
+                matchedRxcui = "723",
+                matchedBrandId = null,
+                dose = "500 mg",
+                frequency = "Thrice daily",
+                route = "Oral",
+                source = "manual_entry",
+                normalizedIngredient = "Amoxicillin",
+                isVerified = true
+            )
+        )
+        val allergies = listOf(
+            AllergyRecord(
+                id = "alg_1",
+                userId = "user_1",
+                allergenName = "Penicillin",
+                reaction = "Hives and rash",
+                severity = "Severe"
+            )
+        )
+
+        val findings = safetyEngine.runSafetyAnalysis("user_1", medications, allergies)
+
+        val allergyFinding = findings.find { it.type == FindingType.ALLERGY_MATCH }
+        assertNotNull("Should detect Penicillin class allergy for Amoxicillin", allergyFinding)
+        assertEquals(FindingSeverity.CRITICAL, allergyFinding?.severity)
+        assertTrue(allergyFinding?.mechanismOrDetail?.contains("Penicillin", ignoreCase = true) == true)
     }
 }
