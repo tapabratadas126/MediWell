@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">MEDCHCK</string>
+    <string name="disclaimer_referral">যেকোনো ওষুধ পরিবর্তন বা বন্ধ করার আগে সর্বদা একজন যোগ্য ফার্মাসিস্ট বা ডাক্তারের পরামর্শ নিন।</string>
+    <string name="medication_safety_subtitle">ওষুধের নিরাপত্তা ও সহজ ভাষায় বিশ্লেষণ</string>
+    <string name="nav_home">হোম</string>
+    <string name="nav_rx">প্রেসক্রিপশন</string>
+    <string name="nav_medicines">ওষুধ</string>
+    <string name="nav_reports">রিপোর্ট</string>
+    <string name="nav_profile">প্রোফাইল</string>
+    <string name="sign_in">সাইন ইন</string>
+    <string name="create_account">অ্যাকাউন্ট তৈরি করুন</string>
+    <string name="save_profile">প্রোফাইল সংরক্ষণ করুন</string>
+</resources>

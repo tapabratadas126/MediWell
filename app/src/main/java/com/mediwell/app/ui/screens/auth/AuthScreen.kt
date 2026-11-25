@@ -1,19 +1,8 @@
 package com.mediwell.app.ui.screens.auth
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -21,294 +10,250 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.MedicalServices
-import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.input.*
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.mediwell.app.ui.theme.TealContainer
-import com.mediwell.app.ui.theme.TealOnContainer
-import com.mediwell.app.ui.theme.TealPrimary
+import com.mediwell.app.ui.theme.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AuthScreen(
     viewModel: AuthViewModel,
     onAuthSuccess: () -> Unit
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val email by viewModel.email.collectAsState()
+    val uiState  by viewModel.uiState.collectAsState()
+    val email    by viewModel.email.collectAsState()
     val password by viewModel.password.collectAsState()
     val isSignUp by viewModel.isSignUp.collectAsState()
 
     var passwordVisible by remember { mutableStateOf(false) }
-    val focusManager = LocalFocusManager.current
-    val scrollState = rememberScrollState()
+    val focusManager   = LocalFocusManager.current
+    val scrollState    = rememberScrollState()
 
     LaunchedEffect(uiState) {
-        if (uiState is AuthUiState.Authenticated) {
-            onAuthSuccess()
-        }
+        if (uiState is AuthUiState.Authenticated) onAuthSuccess()
     }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background
-    ) { innerPadding ->
+    Scaffold(containerColor = Ivory) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(scrollState)
-                .padding(horizontal = 24.dp, vertical = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Top
+                .padding(horizontal = 24.dp, vertical = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // App Logo Icon
+            // ── Logo + wordmark ──────────────────────────────────────────────
             Box(
                 modifier = Modifier
-                    .size(72.dp)
-                    .clip(CircleShape)
-                    .background(TealContainer),
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(ForestGreen),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.MedicalServices,
-                    contentDescription = "MEDCHCK Logo",
-                    tint = TealOnContainer,
-                    modifier = Modifier.size(40.dp)
-                )
+                Text("M+", color = White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(16.dp))
 
             Text(
                 text = "MEDCHCK",
-                style = MaterialTheme.typography.headlineLarge,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color      = ForestGreen
+                )
             )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
             Text(
-                text = "Medication Safety & Plain-Language Intelligence",
+                text = "Medication Safety & Intelligence",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.secondary,
+                color = TextTertiary,
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(Modifier.height(40.dp))
 
-            // Auth Card - Supabase Email & Password Auth ONLY
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            // ── Tab row ──────────────────────────────────────────────────────
+            Surface(
+                shape    = RoundedCornerShape(12.dp),
+                color    = SageGreen,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp)
-                ) {
-                    // Sign In / Register Tabs
-                    TabRow(
-                        selectedTabIndex = if (isSignUp) 1 else 0,
-                        containerColor = Color.Transparent,
-                        contentColor = TealPrimary
-                    ) {
-                        Tab(
-                            selected = !isSignUp,
-                            onClick = { viewModel.setAuthMode(false) },
-                            text = { Text("Sign In", fontWeight = FontWeight.SemiBold) }
-                        )
-                        Tab(
-                            selected = isSignUp,
-                            onClick = { viewModel.setAuthMode(true) },
-                            text = { Text("Create Account", fontWeight = FontWeight.SemiBold) }
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // Email Field
-                    OutlinedTextField(
-                        value = email,
-                        onValueChange = { viewModel.updateEmail(it) },
-                        label = { Text("Email Address") },
-                        placeholder = { Text("patient@example.com") },
-                        leadingIcon = {
-                            Icon(Icons.Default.Email, contentDescription = null, tint = TealPrimary)
-                        },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Email,
-                            imeAction = ImeAction.Next
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Password Field
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { viewModel.updatePassword(it) },
-                        label = { Text("Password") },
-                        placeholder = { Text(if (isSignUp) "At least 6 characters" else "Your password") },
-                        leadingIcon = {
-                            Icon(Icons.Default.Lock, contentDescription = null, tint = TealPrimary)
-                        },
-                        trailingIcon = {
-                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                Icon(
-                                    imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                    contentDescription = if (passwordVisible) "Hide password" else "Show password"
-                                )
-                            }
-                        },
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Password,
-                            imeAction = ImeAction.Done
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onDone = {
-                                focusManager.clearFocus()
-                                viewModel.submitEmailAuth()
-                            }
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    // Error Message Banner
-                    if (uiState is AuthUiState.Error) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Box(
+                Row(Modifier.padding(4.dp)) {
+                    listOf(Pair(false, "Sign In"), Pair(true, "Create Account")).forEach { (signUp, label) ->
+                        val selected = isSignUp == signUp
+                        Surface(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    color = Color(0xFFFFEBEE),
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                                .padding(10.dp)
+                                .weight(1f)
+                                .clip(RoundedCornerShape(10.dp)),
+                            color    = if (selected) White else androidx.compose.ui.graphics.Color.Transparent,
+                            onClick  = { viewModel.setAuthMode(signUp) }
                         ) {
                             Text(
-                                text = (uiState as AuthUiState.Error).message,
-                                color = Color(0xFFC62828),
-                                style = MaterialTheme.typography.bodySmall
+                                text        = label,
+                                modifier    = Modifier.padding(vertical = 10.dp),
+                                textAlign   = TextAlign.Center,
+                                fontWeight  = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                color       = if (selected) ForestGreen else TextTertiary,
+                                fontSize    = 14.sp
                             )
                         }
                     }
+                }
+            }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+            Spacer(Modifier.height(24.dp))
 
-                    // Submit Button (Email/Password with Supabase Auth)
+            // ── Input card ───────────────────────────────────────────────────
+            Surface(
+                shape          = RoundedCornerShape(16.dp),
+                color          = White,
+                tonalElevation = 0.dp,
+                modifier       = Modifier.fillMaxWidth()
+            ) {
+                Column(Modifier.padding(20.dp)) {
+                    // Error banner
+                    if (uiState is AuthUiState.Error) {
+                        Surface(shape = RoundedCornerShape(8.dp), color = CriticalRedBg) {
+                            Text(
+                                text     = (uiState as AuthUiState.Error).message,
+                                modifier = Modifier.padding(12.dp),
+                                color    = CriticalRed,
+                                style    = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Spacer(Modifier.height(16.dp))
+                    }
+
+                    // Email field
+                    OutlinedTextField(
+                        value         = email,
+                        onValueChange = viewModel::updateEmail,
+                        label         = { Text("Email Address") },
+                        leadingIcon   = { Icon(Icons.Default.Email, null, tint = TextTertiary) },
+                        modifier      = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Email,
+                            imeAction    = ImeAction.Next
+                        ),
+                        singleLine = true,
+                        shape      = RoundedCornerShape(10.dp),
+                        colors     = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = ForestGreen,
+                            focusedLabelColor  = ForestGreen
+                        )
+                    )
+
+                    Spacer(Modifier.height(12.dp))
+
+                    // Password field
+                    OutlinedTextField(
+                        value         = password,
+                        onValueChange = viewModel::updatePassword,
+                        label         = { Text("Password") },
+                        leadingIcon   = { Icon(Icons.Default.Lock, null, tint = TextTertiary) },
+                        trailingIcon  = {
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(
+                                    imageVector = if (passwordVisible) Icons.Default.VisibilityOff
+                                                  else Icons.Default.Visibility,
+                                    contentDescription = if (passwordVisible) "Hide" else "Show",
+                                    tint = TextTertiary
+                                )
+                            }
+                        },
+                        modifier            = Modifier.fillMaxWidth(),
+                        visualTransformation = if (passwordVisible) VisualTransformation.None
+                                               else PasswordVisualTransformation(),
+                        keyboardOptions     = KeyboardOptions(
+                            keyboardType = KeyboardType.Password,
+                            imeAction    = ImeAction.Done
+                        ),
+                        keyboardActions     = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                        singleLine          = true,
+                        shape               = RoundedCornerShape(10.dp),
+                        colors              = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = ForestGreen,
+                            focusedLabelColor  = ForestGreen
+                        )
+                    )
+
+                    if (isSignUp) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Password must be at least 6 characters",
+                            style    = MaterialTheme.typography.labelSmall,
+                            color    = TextTertiary,
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
+                    }
+
+                    Spacer(Modifier.height(20.dp))
+
+                    // Primary action button
                     Button(
-                        onClick = {
+                        onClick  = {
                             focusManager.clearFocus()
                             viewModel.submitEmailAuth()
                         },
-                        enabled = uiState !is AuthUiState.Loading,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = TealPrimary)
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        enabled  = uiState !is AuthUiState.Loading,
+                        shape    = RoundedCornerShape(12.dp),
+                        colors   = ButtonDefaults.buttonColors(containerColor = ForestGreen)
                     ) {
                         if (uiState is AuthUiState.Loading) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(22.dp),
-                                color = Color.White,
+                                modifier    = Modifier.size(20.dp),
+                                color       = White,
                                 strokeWidth = 2.dp
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Authenticating...")
                         } else {
                             Text(
-                                text = if (isSignUp) "Create Supabase Account" else "Sign In with Supabase",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold
+                                text       = if (isSignUp) "Create Account" else "Sign In",
+                                color      = White,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize   = 15.sp
                             )
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(Modifier.height(24.dp))
 
-            // Clinical Security Card
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        color = Color(0xFFF0F7F6),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    .padding(14.dp)
+            // ── RLS security note ────────────────────────────────────────────
+            Surface(
+                shape    = RoundedCornerShape(10.dp),
+                color    = SageGreen,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Row(verticalAlignment = Alignment.Top) {
-                    Icon(
-                        imageVector = Icons.Default.Shield,
-                        contentDescription = null,
-                        tint = TealPrimary,
-                        modifier = Modifier
-                            .size(18.dp)
-                            .padding(top = 2.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
+                    Text("🔒", fontSize = 14.sp)
+                    Spacer(Modifier.width(8.dp))
                     Column {
                         Text(
-                            text = "Supabase Row-Level Security Enabled",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = TealPrimary
+                            "Your data is protected",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize   = 12.sp,
+                            color      = ForestGreen
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Prescriptions, reports, and findings are protected by Postgres RLS scoped strictly to your authenticated session.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF2C3E44)
+                            "Prescriptions and reports are secured by Supabase Row-Level Security, scoped to your authenticated session.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextSecondary
                         )
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
