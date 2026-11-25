@@ -443,17 +443,23 @@ private fun MedicationLabelCard(info: MedicationLabelInfo) {
     var showWarnings by remember { mutableStateOf(false) }
     var showAgeRestrictions by remember { mutableStateOf(false) }
 
+    // Distinct background card surface (soft cream/light sage surface with subtle border)
     Surface(
-        color = White,
-        shape = RoundedCornerShape(14.dp),
-        modifier = Modifier.fillMaxWidth()
+        color = Color(0xFFFCFDFB), // Soft ivory/cream-tinted surface distinct from base Ivory (#F7F6F1)
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, BorderGray),
+        shadowElevation = 1.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            // Header with larger, bolder medicine name and badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -461,34 +467,48 @@ private fun MedicationLabelCard(info: MedicationLabelInfo) {
             ) {
                 Text(
                     text = info.medicineName,
-                    fontSize = 16.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = ForestGreen
                 )
-                Surface(shape = RoundedCornerShape(6.dp), color = SageGreen) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = SageGreen
+                ) {
                     Text(
                         text = "Reference Guide",
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
+                        fontWeight = FontWeight.SemiBold,
                         color = ForestGreen
                     )
                 }
             }
 
-            // 1. General uses
-            ReferenceSectionBlock(
+            // Sub-section 1: General uses (with truncation + Read more)
+            ReferenceSectionBlockWithTruncate(
                 title = "General uses",
                 body = info.purpose
             )
 
-            // 2. Official label instructions (clearly separated from personal Rx)
-            Column {
+            // Sub-section 2: How to take
+            ReferenceSectionBlock(
+                title = "How to take",
+                body = info.administrationGuide
+            )
+
+            // Sub-section 3: Dosage
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(color = SageGreen.copy(alpha = 0.45f), shape = RoundedCornerShape(10.dp))
+                    .padding(12.dp)
+            ) {
                 Text(
-                    text = "Official label instructions",
+                    text = "Dosage",
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = TextPrimary
+                    fontWeight = FontWeight.Bold,
+                    color = ForestGreen
                 )
                 Text(
                     text = "General reference only — always follow your personal prescription",
@@ -496,49 +516,41 @@ private fun MedicationLabelCard(info: MedicationLabelInfo) {
                     color = ReviewAmber,
                     fontWeight = FontWeight.Medium
                 )
-                Spacer(modifier = Modifier.height(3.dp))
-                Text(
-                    text = "• How to take: ${info.administrationGuide}",
-                    fontSize = 13.sp,
-                    color = TextSecondary,
-                    lineHeight = 18.sp
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "• Typical adult label range: ${info.typicalDosage}",
-                    fontSize = 13.sp,
-                    color = TextSecondary,
-                    lineHeight = 18.sp
+                Spacer(modifier = Modifier.height(4.dp))
+                TruncatedText(
+                    text = info.typicalDosage,
+                    maxLines = 3
                 )
             }
 
-            HorizontalDivider(color = BorderGray, thickness = 0.5.dp)
-
-            // 3. Expandable Precautions and warnings
+            // Sub-section 4: Precautions & warnings (collapsible, collapsed by default)
             ExpandableReferenceSection(
-                title = "Precautions and warnings",
+                title = "Precautions & warnings",
                 expanded = showWarnings,
                 onToggle = { showWarnings = !showWarnings },
                 body = info.warningsAndPrecautions,
-                accentColor = CriticalRed
+                accentColor = CriticalRed,
+                containerColor = CriticalRedBg.copy(alpha = 0.5f)
             )
 
-            // 4. Expandable Important age-related restrictions
+            // Sub-section 5: Age-related restrictions (collapsible, collapsed by default)
             ExpandableReferenceSection(
-                title = "Important age-related restrictions",
+                title = "Age-related restrictions",
                 expanded = showAgeRestrictions,
                 onToggle = { showAgeRestrictions = !showAgeRestrictions },
                 body = info.ageRestrictions,
-                accentColor = ForestGreen
+                accentColor = ForestGreen,
+                containerColor = SageGreen.copy(alpha = 0.5f)
             )
 
             HorizontalDivider(color = BorderGray, thickness = 0.5.dp)
 
-            // 5. Source and update information
+            // Muted source and update information at bottom
             Text(
                 text = "Source: ${info.source} · ${info.lastUpdated}",
                 fontSize = 11.sp,
-                color = TextTertiary
+                color = TextTertiary,
+                lineHeight = 15.sp
             )
         }
     }
@@ -546,20 +558,77 @@ private fun MedicationLabelCard(info: MedicationLabelInfo) {
 
 @Composable
 private fun ReferenceSectionBlock(title: String, body: String) {
-    Column {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
         Text(
             text = title,
             fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = TextPrimary
+            fontWeight = FontWeight.Bold,
+            color = ForestGreen
         )
-        Spacer(modifier = Modifier.height(2.dp))
         Text(
-            text = "• $body",
+            text = body,
             fontSize = 13.sp,
             color = TextSecondary,
-            lineHeight = 18.sp
+            lineHeight = 19.sp
         )
+    }
+}
+
+@Composable
+private fun ReferenceSectionBlockWithTruncate(title: String, body: String) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        Text(
+            text = title,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = ForestGreen
+        )
+        TruncatedText(
+            text = body,
+            maxLines = 3
+        )
+    }
+}
+
+@Composable
+private fun TruncatedText(
+    text: String,
+    maxLines: Int = 3
+) {
+    var isExpanded by remember { mutableStateOf(false) }
+    var hasOverflow by remember { mutableStateOf(false) }
+
+    Column {
+        Text(
+            text = text,
+            fontSize = 13.sp,
+            color = TextSecondary,
+            lineHeight = 19.sp,
+            maxLines = if (isExpanded) Int.MAX_VALUE else maxLines,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            onTextLayout = { textLayoutResult ->
+                if (!isExpanded && textLayoutResult.hasVisualOverflow) {
+                    hasOverflow = true
+                }
+            }
+        )
+        if (hasOverflow || isExpanded) {
+            Text(
+                text = if (isExpanded) "Show less" else "Read more",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = ForestGreen,
+                modifier = Modifier
+                    .clickable { isExpanded = !isExpanded }
+                    .padding(top = 2.dp)
+            )
+        }
     }
 }
 
@@ -569,38 +638,60 @@ private fun ExpandableReferenceSection(
     expanded: Boolean,
     onToggle: () -> Unit,
     body: String,
-    accentColor: Color
+    accentColor: Color,
+    containerColor: Color
 ) {
-    Column {
-        Row(
+    Surface(
+        color = containerColor,
+        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onToggle)
-                .padding(vertical = 2.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(12.dp)
         ) {
-            Text(
-                text = title,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = accentColor
-            )
-            Icon(
-                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                contentDescription = null,
-                tint = accentColor,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-        AnimatedVisibility(visible = expanded) {
-            Text(
-                text = "• $body",
-                modifier = Modifier.padding(top = 4.dp),
-                fontSize = 13.sp,
-                color = TextSecondary,
-                lineHeight = 18.sp
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onToggle),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = accentColor
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = if (expanded) "Hide" else "Show",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = accentColor
+                    )
+                    Icon(
+                        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = if (expanded) "Hide" else "Show",
+                        tint = accentColor,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+            AnimatedVisibility(visible = expanded) {
+                Column(modifier = Modifier.padding(top = 8.dp)) {
+                    Text(
+                        text = body,
+                        fontSize = 13.sp,
+                        color = TextPrimary,
+                        lineHeight = 19.sp
+                    )
+                }
+            }
         }
     }
 }
